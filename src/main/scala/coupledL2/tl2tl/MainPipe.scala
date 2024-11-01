@@ -29,6 +29,7 @@ import coupledL2._
 import coupledL2.utils._
 import coupledL2.debug._
 import coupledL2.prefetch.{PfSource, PrefetchTrain}
+import xs.utils.perf.{XSPerfAccumulate, XSPerfHistogram}
 
 class MainPipe(implicit p: Parameters) extends L2Module with HasPerfEvents {
   val io = IO(new Bundle() {

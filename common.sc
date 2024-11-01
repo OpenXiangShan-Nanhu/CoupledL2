@@ -9,5 +9,7 @@ trait CoupledL2Module extends ScalaModule {
 
   def huancunModule: ScalaModule
 
-  override def moduleDeps = super.moduleDeps ++ Seq(rocketModule, utilityModule, huancunModule)
+  def xsutilsModule: ScalaModule
+
+  override def moduleDeps = super.moduleDeps ++ Seq(rocketModule, utilityModule, huancunModule, xsutilsModule)
 }

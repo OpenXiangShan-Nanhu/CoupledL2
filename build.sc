@@ -10,13 +10,13 @@ import $file.`rocket-chip`.cde.common
 import $file.`rocket-chip`.hardfloat.build
 
 val defaultVersions = Map(
-  "chisel3" -> "3.6.0",
-  "chisel3-plugin" -> "3.6.0",
-  "chiseltest" -> "0.6.2",
+  "chisel" -> "6.1.0",
+  "chisel-plugin" -> "6.1.0",
+  "chiseltest" -> "5.0.0",
   "scala" -> "2.13.10",
 )
 
-def getVersion(dep: String, org: String = "edu.berkeley.cs", cross: Boolean = false) = {
+def getVersion(dep: String, org: String = "org.chipsalliance", cross: Boolean = false) = {
   val version = sys.env.getOrElse(dep + "Version", defaultVersions(dep))
   if (cross)
     ivy"$org:::$dep:$version"
@@ -29,9 +29,9 @@ trait HasChisel extends ScalaModule {
 
   def chiselPluginJar: T[Option[PathRef]] = None
 
-  def chiselIvy: Option[Dep] = Some(getVersion("chisel3"))
+  def chiselIvy: Option[Dep] = Some(getVersion("chisel"))
 
-  def chiselPluginIvy: Option[Dep] = Some(getVersion("chisel3-plugin", cross=true))
+  def chiselPluginIvy: Option[Dep] = Some(getVersion("chisel-plugin", cross=true))
 
   override def scalaVersion = defaultVersions("scala")
 
@@ -78,6 +78,12 @@ object utility extends SbtModule with HasChisel {
   override def moduleDeps = super.moduleDeps ++ Seq(rocketchip)
  }
 
+object xsutils extends SbtModule with HasChisel {
+  override def millSourcePath = os.pwd / "xs-utils"
+
+  override def moduleDeps = super.moduleDeps ++ Seq(rocketchip)
+ }
+
 object huancun extends SbtModule with HasChisel {
   override def millSourcePath = os.pwd / "HuanCun"
   override def moduleDeps = super.moduleDeps ++ Seq(
@@ -95,9 +101,11 @@ object CoupledL2 extends SbtModule with HasChisel with millbuild.common.CoupledL
 
   def huancunModule: ScalaModule = huancun
 
+  def xsutilsModule: ScalaModule = xsutils
+
   object test extends SbtModuleTests with TestModule.ScalaTest {
     override def ivyDeps = super.ivyDeps() ++ Agg(
-      getVersion("chiseltest"),
+      getVersion("chiseltest", "edu.berkeley.cs"),
     )
   }
 }

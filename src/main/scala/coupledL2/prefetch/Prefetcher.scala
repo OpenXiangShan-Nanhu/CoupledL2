@@ -23,6 +23,7 @@ import utility._
 import org.chipsalliance.cde.config.Parameters
 import freechips.rocketchip.tilelink._
 import coupledL2._
+import xs.utils.perf.{XSPerfAccumulate, XSPerfHistogram}
 
 /* virtual address */
 trait HasPrefetcherHelper extends HasCircularQueuePtrHelper with HasCoupledL2Parameters {

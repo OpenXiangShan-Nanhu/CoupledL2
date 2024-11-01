@@ -28,6 +28,7 @@ import coupledL2._
 import coupledL2.prefetch.{PrefetchTrain, PfSource}
 import coupledL2.tl2chi.CHICohStates._
 import coupledL2.MetaData._
+import xs.utils.perf.{XSPerfAccumulate, XSPerfHistogram}
 
 class MainPipe(implicit p: Parameters) extends TL2CHIL2Module with HasCHIOpcodes with HasPerfEvents {
   val io = IO(new Bundle() {

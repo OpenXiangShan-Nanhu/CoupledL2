@@ -17,7 +17,8 @@
 
 package coupledL2.prefetch
 
-import utility.{ChiselDB, Constantin, MemReqSource, ParallelPriorityMux, RRArbiterInit, SRAMTemplate, XSPerfAccumulate}
+import utility.{ChiselDB, Constantin, MemReqSource, ParallelPriorityMux, RRArbiterInit, SRAMTemplate}
+import xs.utils.perf.{XSPerfAccumulate, XSPerfHistogram}
 import org.chipsalliance.cde.config.Parameters
 import chisel3.DontCare.:=
 import chisel3._

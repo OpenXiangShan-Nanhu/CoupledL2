@@ -21,7 +21,8 @@ package coupledL2
 
 import chisel3._
 import chisel3.util._
-import utility.{FastArbiter, ParallelMax, ParallelPriorityMux, Pipeline, RegNextN, XSPerfAccumulate, HasPerfEvents, PipelineConnect}
+import utility.{FastArbiter, ParallelMax, ParallelPriorityMux, Pipeline, RegNextN, HasPerfEvents, PipelineConnect}
+import xs.utils.perf.{XSPerfAccumulate, XSPerfHistogram}
 import freechips.rocketchip.diplomacy._
 import freechips.rocketchip.tile.MaxHartIdBits
 import freechips.rocketchip.tilelink._

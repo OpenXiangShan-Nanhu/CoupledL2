@@ -21,7 +21,8 @@ import chisel3._
 import chisel3.util._
 import freechips.rocketchip.util.SetAssocLRU
 import coupledL2.utils._
-import utility.{ParallelPriorityMux, RegNextN, XSPerfAccumulate}
+import utility.{ParallelPriorityMux, RegNextN}
+import xs.utils.perf.{XSPerfAccumulate, XSPerfHistogram}
 import org.chipsalliance.cde.config.Parameters
 import coupledL2.prefetch.PfSource
 import freechips.rocketchip.tilelink.TLMessages._

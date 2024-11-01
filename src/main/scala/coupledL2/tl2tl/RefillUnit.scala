@@ -23,8 +23,8 @@ import freechips.rocketchip.tilelink._
 import freechips.rocketchip.tilelink.TLMessages._
 import org.chipsalliance.cde.config.Parameters
 import coupledL2._
-import utility.XSPerfAccumulate
 import huancun.{DirtyKey, IsHitKey}
+import xs.utils.perf.{XSPerfAccumulate, XSPerfHistogram}
 
 class grantAckQEntry(implicit p: Parameters) extends L2Bundle {
   val source = UInt(sourceIdBits.W)

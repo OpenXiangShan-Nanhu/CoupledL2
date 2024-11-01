@@ -1,9 +1,10 @@
 package coupledL2
 
+import _root_.circt.stage.ChiselStage
 import chisel3._
 import chisel3.util._
 import org.chipsalliance.cde.config._
-import chisel3.stage.{ChiselGeneratorAnnotation, ChiselStage}
+import chisel3.stage.ChiselGeneratorAnnotation
 import freechips.rocketchip.diplomacy._
 import freechips.rocketchip.tile.MaxHartIdBits
 import freechips.rocketchip.tilelink._
