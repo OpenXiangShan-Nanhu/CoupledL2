@@ -313,27 +313,10 @@ class NestedWriteback(implicit p: Parameters) extends L2Bundle {
   val b_toN = chiOpt.map(_ => Bool())
 }
 
-class PrefetchRecv extends Bundle {
-  val addr = UInt(64.W)
-  val pf_source = UInt(MemReqSource.reqSourceBits.W)
-  val addr_valid = Bool()
-  val l2_pf_en = Bool()
-}
-
 // custom l2 - l1 interface
 class L2ToL1Hint(implicit p: Parameters) extends Bundle {
   val sourceId = UInt(32.W)    // tilelink sourceID
   val isKeyword = Bool()       // miss entry keyword
-}
-
-// custom l2 - l1 CMO inst req
-class CMOReq(implicit p: Parameters) extends Bundle {
-  val opcode = UInt(3.W)   // 0-cbo.clean, 1-cbo.flush, 2-cbo.inval, 3-cbo.zero
-  val address = UInt(64.W)
-}
-// custom l2 - l1 CMO inst resp(ack)
-class CMOResp(implicit p: Parameters) extends Bundle {
-  val address = UInt(64.W)
 }
 
 // custom l2 - l1 tlb

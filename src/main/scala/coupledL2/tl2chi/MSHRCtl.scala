@@ -27,6 +27,7 @@ import freechips.rocketchip.tilelink.TLMessages._
 import coupledL2.prefetch.PrefetchTrain
 import coupledL2._
 import xs.utils.perf.{XSPerfAccumulate, XSPerfHistogram}
+import xs.utils.common._
 
 class MSHRCtl(implicit p: Parameters) extends TL2CHIL2Module with HasCHIOpcodes with HasPerfEvents {
   val io = IO(new Bundle() {

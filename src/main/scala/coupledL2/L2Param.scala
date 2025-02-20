@@ -27,8 +27,6 @@ import huancun.{AliasKey, CacheParameters, IsHitKey, PrefetchKey}
 import coupledL2.prefetch._
 import utility.{MemReqSource, ReqSourceKey}
 
-case object EnableCHI extends Field[Boolean](false)
-
 // L1 Cache Params, used for TestTop generation
 case class L1Param
 (
@@ -56,8 +54,8 @@ case class IsKeywordField() extends BundleField[Bool](IsKeywordKey, Output(Bool(
 
 case class L2Param(
   name: String = "L2",
-  ways: Int = 4,
-  sets: Int = 128,
+  ways: Int = 8,
+  sets: Int = 1024,
   blockBytes: Int = 64,
   pageBytes: Int = 4096,
   channelBytes: TLChannelBeatBytes = TLChannelBeatBytes(32),
@@ -91,7 +89,10 @@ case class L2Param(
 
   hartId: Int = 0,
   // Prefetch
-  prefetch: Seq[PrefetchParameters] = Nil,
+  prefetch: Seq[PrefetchParameters] = Seq(
+    coupledL2.prefetch.PrefetchReceiverParams(),
+    coupledL2.prefetch.BOPParameters(),
+    coupledL2.prefetch.TPParameters()),
   // Performance analysis
   enablePerf: Boolean = true,
   // RollingDB
@@ -100,6 +101,8 @@ case class L2Param(
   enableMonitor: Boolean = true,
   // TLLog
   enableTLLog: Boolean = true,
+
+  enableCHI : Boolean = false,
   // CHILog
   enableCHILog: Boolean = true,
   // TopDown
@@ -121,7 +124,7 @@ case class L2Param(
   )
 }
 
-case object L2ParamKey extends Field[L2Param](L2Param())
+case object L2ParamKey extends Field[L2Param]
 
 case object EdgeInKey extends Field[TLEdgeIn]
 

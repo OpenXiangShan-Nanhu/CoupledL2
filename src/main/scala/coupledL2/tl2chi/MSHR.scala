@@ -31,6 +31,7 @@ import coupledL2.tl2chi.CHIChannel
 import coupledL2.tl2chi.RespErrEncodings._
 import coupledL2.MetaData._
 import coupledL2._
+import xs.utils.common._
 
 
 class MSHRTasks(implicit p: Parameters) extends TL2CHIL2Bundle {

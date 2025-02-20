@@ -24,7 +24,7 @@ import org.chipsalliance.cde.config.Parameters
 import freechips.rocketchip.tilelink._
 import freechips.rocketchip.tilelink.TLMessages._
 import coupledL2._
-import coupledL2.prefetch.PrefetchTrain
+import xs.utils.common._
 import xs.utils.perf.{XSPerfAccumulate, XSPerfHistogram, XSPerfMax}
 
 class MSHRSelector(implicit p: Parameters) extends L2Module {

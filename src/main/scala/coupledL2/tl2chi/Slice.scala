@@ -19,10 +19,8 @@ package coupledL2.tl2chi
 
 import chisel3._
 import chisel3.util._
-import freechips.rocketchip.tilelink._
 import org.chipsalliance.cde.config.Parameters
 import coupledL2._
-import coupledL2.prefetch.PrefetchIO
 
 class OuterBundle(implicit p: Parameters) extends DecoupledPortIO with BaseOuterBundle
 

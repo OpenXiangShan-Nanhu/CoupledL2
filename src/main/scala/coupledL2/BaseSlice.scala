@@ -22,6 +22,7 @@ import chisel3.util._
 import org.chipsalliance.cde.config.Parameters
 import freechips.rocketchip.tilelink.TLBundle
 import utility._
+import xs.utils.common._
 import coupledL2.prefetch.PrefetchIO
 
 trait BaseOuterBundle

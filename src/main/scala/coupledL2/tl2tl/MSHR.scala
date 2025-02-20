@@ -25,6 +25,7 @@ import freechips.rocketchip.tilelink._
 import freechips.rocketchip.tilelink.TLMessages._
 import freechips.rocketchip.tilelink.TLPermissions._
 import org.chipsalliance.cde.config.Parameters
+import xs.utils.common._
 import coupledL2._
 import coupledL2.prefetch.{PfSource, PrefetchTrain}
 

@@ -23,6 +23,7 @@ import chisel3._
 import chisel3.util._
 import utility.{FastArbiter, ParallelMax, ParallelPriorityMux, Pipeline, RegNextN, HasPerfEvents, PipelineConnect}
 import xs.utils.perf.{XSPerfAccumulate, XSPerfHistogram}
+import xs.utils.common._
 import freechips.rocketchip.diplomacy._
 import freechips.rocketchip.tile.MaxHartIdBits
 import freechips.rocketchip.tilelink._
@@ -36,8 +37,9 @@ import huancun.{TPmetaReq, TPmetaResp, BankBitsKey}
 trait HasCoupledL2Parameters {
   val p: Parameters
   // val tl2tlParams: HasTLL2Parameters = p(L2ParamKey)
-  def enableCHI = p(EnableCHI)
+
   def cacheParams = p(L2ParamKey)
+  def enableCHI = cacheParams.enableCHI
 
   def XLEN = 64
   def blocks = cacheParams.sets * cacheParams.ways
