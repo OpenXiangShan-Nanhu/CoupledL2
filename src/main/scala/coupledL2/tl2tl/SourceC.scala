@@ -23,7 +23,7 @@ import utility._
 import org.chipsalliance.cde.config.Parameters
 import freechips.rocketchip.tilelink._
 import coupledL2._
-import huancun.DirtyKey
+import xs.utils.common.DirtyKey
 
 //class SourceC(implicit p: Parameters) extends L2Module {
 //  val io = IO(new Bundle() {

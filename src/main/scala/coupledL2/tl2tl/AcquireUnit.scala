@@ -23,7 +23,7 @@ import utility._
 import freechips.rocketchip.tilelink._
 import freechips.rocketchip.tilelink.TLMessages._
 import org.chipsalliance.cde.config.Parameters
-import huancun.{DirtyKey, PreferCacheKey}
+import xs.utils.common.{DirtyKey, PreferCacheKey}
 import coupledL2._
 
 class AcquireUnit(implicit p: Parameters) extends L2Module {

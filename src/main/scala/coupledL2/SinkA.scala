@@ -24,7 +24,7 @@ import freechips.rocketchip.tilelink._
 import freechips.rocketchip.tilelink.TLMessages._
 import freechips.rocketchip.tilelink.TLHints._
 import coupledL2.prefetch.PrefetchReq
-import huancun.{AliasKey, PrefetchKey}
+import xs.utils.common.{VaddrKey, AliasKey, PrefetchKey, IsKeywordKey}
 import utility.MemReqSource
 import xs.utils.perf.{XSPerfAccumulate, XSPerfHistogram}
 

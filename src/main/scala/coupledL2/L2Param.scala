@@ -23,9 +23,10 @@ import freechips.rocketchip.diplomacy.{BufferParams, AddressSet}
 import freechips.rocketchip.tilelink._
 import freechips.rocketchip.util._
 import org.chipsalliance.cde.config.Field
-import huancun.{AliasKey, CacheParameters, IsHitKey, PrefetchKey}
+import huancun.CacheParameters
 import coupledL2.prefetch._
 import utility.{MemReqSource, ReqSourceKey}
+import xs.utils.common._
 
 // L1 Cache Params, used for TestTop generation
 case class L1Param
@@ -44,13 +45,14 @@ case class L1Param
   val needResolveAlias = aliasBitsOpt.nonEmpty
 }
 
-// Pass virtual address of upper level cache
-case object VaddrKey extends ControlKey[UInt]("vaddr")
-case class VaddrField(width: Int) extends BundleField[UInt](VaddrKey, Output(UInt(width.W)), _ := 0.U(width.W))
-
-// Pass load_miss_acquire_keyword of upper level cache (L1)
-case object IsKeywordKey extends ControlKey[Bool]("isKeyword")
-case class IsKeywordField() extends BundleField[Bool](IsKeywordKey, Output(Bool()), _ := false.B)
+// move to xsutil
+//// Pass virtual address of upper level cache
+//case object VaddrKey extends ControlKey[UInt]("vaddr")
+//case class VaddrField(width: Int) extends BundleField[UInt](VaddrKey, Output(UInt(width.W)), _ := 0.U(width.W))
+//
+//// Pass load_miss_acquire_keyword of upper level cache (L1)
+//case object IsKeywordKey extends ControlKey[Bool]("isKeyword")
+//case class IsKeywordField() extends BundleField[Bool](IsKeywordKey, Output(Bool()), _ := false.B)
 
 case class L2Param(
   name: String = "L2",
