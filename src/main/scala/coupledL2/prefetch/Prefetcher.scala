@@ -19,10 +19,12 @@ package coupledL2.prefetch
 
 import chisel3._
 import chisel3.util._
-import utility._
 import org.chipsalliance.cde.config.Parameters
-import utility.mbist.MbistPipeline
+import xs.utils.mbist.MbistPipeline
 import coupledL2._
+import xs.utils.{ChiselDB, HasCircularQueuePtrHelper, ParallelPriorityMux, Pipeline, RegNextN, ValidIODelay}
+import xs.utils.perf.{XSPerfAccumulate, XSPerfHistogram}
+import xs.utils.tl.MemReqSource
 
 /* virtual address */
 trait HasPrefetcherHelper extends HasCircularQueuePtrHelper with HasCoupledL2Parameters {
@@ -313,7 +315,7 @@ class Prefetcher(implicit p: Parameters) extends PrefetchModule {
   if (hasReceiver) {
     pfRcv.get.io_enable := pfRcv_en
     pfRcv.get.io.req.ready := true.B
-    pfRcv.get.io.recv_addr := ValidIODelay(io.recv_addr, 2)
+    pfRcv.get.io.recv_addr := Pipe(io.recv_addr, 2)
     pfRcv.get.io.train.valid := false.B
     pfRcv.get.io.train.bits := 0.U.asTypeOf(new PrefetchTrain)
     pfRcv.get.io.resp.valid := false.B

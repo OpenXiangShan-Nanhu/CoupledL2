@@ -19,13 +19,13 @@ package coupledL2
 
 import chisel3._
 import chisel3.util.log2Ceil
-import freechips.rocketchip.diplomacy.{BufferParams, AddressSet}
+import freechips.rocketchip.diplomacy.{AddressSet, BufferParams}
 import freechips.rocketchip.tilelink._
 import freechips.rocketchip.util._
 import org.chipsalliance.cde.config.Field
-import huancun.{AliasKey, CacheParameters, IsHitKey, PrefetchKey}
 import coupledL2.prefetch._
-import utility.{MemReqSource, ReqSourceKey, Code}
+import xs.utils.common.{AliasKey, IsHitKey, PrefetchKey}
+import xs.utils.tl.ReqSourceKey
 
 case object EnableCHI extends Field[Boolean](false)
 
@@ -128,14 +128,7 @@ case class L2Param(
   sam: Seq[(AddressSet, Int)] = Seq(AddressSet.everything -> 0),
   hasMbist:Boolean = false
 ) {
-  def toCacheParams: CacheParameters = CacheParameters(
-    name = name,
-    sets = sets,
-    ways = ways,
-    blockGranularity = log2Ceil(sets),
-    blockBytes = blockBytes
-  )
-
+  lazy val capacity = sets * ways * blockBytes
   def tagCode: Code = Code.fromString(tagECC)
   def dataCode: Code = Code.fromString(dataECC)
 }

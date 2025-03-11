@@ -19,9 +19,9 @@ package coupledL2
 
 import chisel3._
 import chisel3.util._
-import coupledL2.utils.GatedSplittedSRAM
 import org.chipsalliance.cde.config.Parameters
-import utility.mbist.MbistPipeline
+import xs.utils.mbist.MbistPipeline
+import coupledL2.utils.SplittedSRAM
 
 class DSRequest(implicit p: Parameters) extends L2Bundle {
   val way = UInt(wayBits.W)
@@ -66,7 +66,7 @@ class DataStorage(implicit p: Parameters) extends L2Module {
   })
 
   // read data is set MultiCycle Path 2
-  val array = Module(new GatedSplittedSRAM(
+  val array = Module(new SplittedSRAM(
     gen = new DSECCBankBlock,
     set = blocks,
     way = 1,
@@ -76,7 +76,7 @@ class DataStorage(implicit p: Parameters) extends L2Module {
     hasMbist = p(L2ParamKey).hasMbist,
     extraHold = true
   ))
-  array.io_en := io.en
+
   private val mbistPl = MbistPipeline.PlaceMbistPipeline(1, "L2DataStorage", p(L2ParamKey).hasMbist)
 
   val arrayIdx = Cat(io.req.bits.way, io.req.bits.set)

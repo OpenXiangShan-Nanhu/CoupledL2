@@ -19,12 +19,14 @@ package coupledL2
 
 import chisel3._
 import chisel3.util._
-import utility.mbist.MbistPipeline
+import xs.utils.mbist.MbistPipeline
 import coupledL2.utils._
-import utility.{ParallelPriorityMux, RegNextN, XSPerfAccumulate, Code, SRAMTemplate}
+import xs.utils.{Code, HoldUnless, ParallelPriorityMux, RegNextN}
+import xs.utils.perf.XSPerfAccumulate
 import org.chipsalliance.cde.config.Parameters
 import coupledL2.prefetch.PfSource
 import freechips.rocketchip.tilelink.TLMessages._
+import xs.utils.sram.SRAMTemplate
 
 class MetaEntry(implicit p: Parameters) extends L2Bundle {
   val dirty = Bool()

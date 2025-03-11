@@ -3,12 +3,9 @@ package coupledL2.debug
 import chisel3._
 import chisel3.util._
 import org.chipsalliance.cde.config.Parameters
-import freechips.rocketchip.tilelink._
-import freechips.rocketchip.tilelink.TLMessages._
-import freechips.rocketchip.tilelink.TLPermissions._
 import coupledL2._
 import coupledL2.MetaData._
-import utility._
+import xs.utils.ChiselDB
 
 class MainpipeMoni(implicit p: Parameters) extends L2Bundle {
   val task_s2 = ValidIO(new TaskBundle())

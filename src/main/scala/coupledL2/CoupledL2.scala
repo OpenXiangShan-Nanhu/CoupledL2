@@ -21,8 +21,10 @@ package coupledL2
 
 import chisel3._
 import chisel3.util._
-import utility.{DFTResetSignals, FastArbiter, HasPerfEvents, ParallelMax, ParallelPriorityMux, Pipeline, PipelineConnect, RegNextN, XSPerfAccumulate}
-import freechips.rocketchip.diplomacy._
+import xs.utils.{DFTResetSignals, FastArbiter, ParallelPriorityMux, Pipeline, RegNextN}
+import xs.utils.perf.{HasPerfEvents, XSPerfAccumulate}
+import org.chipsalliance.diplomacy.lazymodule._
+import org.chipsalliance.diplomacy.bundlebridge.{BundleBridgeSink, BundleBridgeSource}
 import freechips.rocketchip.tile.MaxHartIdBits
 import freechips.rocketchip.tilelink._
 import freechips.rocketchip.tilelink.TLMessages._
@@ -31,9 +33,10 @@ import org.chipsalliance.cde.config.{Field, Parameters}
 
 import scala.math.max
 import coupledL2.prefetch._
-import huancun.{BankBitsKey, TPmetaReq, TPmetaResp}
-import utility.mbist.{MbistInterface, MbistPipeline}
-import utility.sram.{SramBroadcastBundle, SramHelper}
+import freechips.rocketchip.diplomacy.{IdRange, RegionType, TransferSizes}
+import xs.utils.common.{TPmetaReq, TPmetaResp}
+import xs.utils.mbist.{MbistInterface, MbistPipeline}
+import xs.utils.sram.{SramBroadcastBundle, SramHelper}
 
 trait HasCoupledL2Parameters {
   val p: Parameters
@@ -326,7 +329,7 @@ abstract class CoupledL2Base(implicit p: Parameters) extends LazyModule with Has
     })
 
     // Display info
-    val sizeBytes = cacheParams.toCacheParams.capacity.toDouble
+    val sizeBytes = cacheParams.capacity.toDouble
     val sizeStr = sizeBytesToStr(sizeBytes)
     println(s"====== Inclusive TL-${if (enableCHI) "CHI" else "TL"} ${cacheParams.name} ($sizeStr * $banks-bank)  ======")
     println(s"prefetch: ${cacheParams.prefetch}")
@@ -600,11 +603,6 @@ abstract class CoupledL2Base(implicit p: Parameters) extends LazyModule with Has
     XSPerfAccumulate("ok2Hints", okHint)
 
     private val sigFromSrams = if (cacheParams.hasMbist) Some(SramHelper.genBroadCastBundleTop()) else None
-    private val cg = if (cacheParams.hasMbist) Some(utility.ClockGate.genTeSrc) else None
-    if (cacheParams.hasMbist) {
-      cg.get.cgen := io.dft.get.cgen
-      sigFromSrams.get := io.dft.get
-    }
 
     private val mbistPl = MbistPipeline.PlaceMbistPipeline(Int.MaxValue, "L2Cache", cacheParams.hasMbist)
     private val l2MbistIntf = if (cacheParams.hasMbist) {

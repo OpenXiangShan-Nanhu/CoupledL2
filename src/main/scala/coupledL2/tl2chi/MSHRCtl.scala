@@ -20,12 +20,14 @@ package coupledL2.tl2chi
 import chisel3._
 import chisel3.util._
 import chisel3.util.random.LFSR
-import utility._
 import org.chipsalliance.cde.config.Parameters
 import freechips.rocketchip.tilelink._
 import freechips.rocketchip.tilelink.TLMessages._
 import coupledL2.prefetch.PrefetchTrain
 import coupledL2._
+import xs.utils.{ParallelOR, ParallelPriorityMux}
+import xs.utils.perf.HasPerfEvents
+import xs.utils.tl.MemReqSource
 
 class MSHRCtl(implicit p: Parameters) extends TL2CHIL2Module with HasCHIOpcodes with HasPerfEvents {
   val io = IO(new Bundle() {

@@ -19,10 +19,10 @@ package coupledL2.tl2chi
 
 import chisel3._
 import chisel3.util._
-import utility._
 import org.chipsalliance.cde.config.Parameters
-import coupledL2.{TaskWithData, TaskBundle, DSBlock, DSBeat}
+import coupledL2.{DSBeat, DSBlock, TaskBundle, TaskWithData}
 import coupledL2.tl2chi.CHICohStates._
+import xs.utils.{ParallelPriorityMux, SECDEDCode}
 
 class TXDATBlockBundle(implicit p: Parameters) extends TXBlockBundle {
   val blockSinkBReqEntrance = Bool()

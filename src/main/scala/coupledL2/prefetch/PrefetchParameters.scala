@@ -21,7 +21,7 @@ import org.chipsalliance.cde.config.Parameters
 import chisel3._
 import chisel3.util._
 import coupledL2._
-import utility.MemReqSource
+import xs.utils.tl.MemReqSource
 
 trait PrefetchParameters {
   val hasPrefetchBit:  Boolean
