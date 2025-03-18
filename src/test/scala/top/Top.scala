@@ -4,6 +4,7 @@ import chisel3._
 import chisel3.stage.ChiselGeneratorAnnotation
 import circt.stage.{ChiselStage, FirtoolOption}
 import coupledL2._
+import coupledL2.prefetch.{BOPParameters, PrefetchReceiverParams}
 import coupledL2.tl2chi.{CHIIssue, Issue, PortIO, TL2CHICoupledL2}
 import freechips.rocketchip.diplomacy.{IdRange, TransferSizes}
 import freechips.rocketchip.tile.MaxHartIdBits
@@ -34,6 +35,7 @@ class Top(implicit p: Parameters) extends LazyModule {
       responseKeys = cacheParams.respKey
     )
   ))
+  // TODO:SET mmioNode optional
   private val mmioNode = TLClientNode(Seq(
     TLMasterPortParameters.v1(
       clients = Seq(TLMasterParameters.v1(
@@ -54,7 +56,9 @@ class Top(implicit p: Parameters) extends LazyModule {
   private val cXBar = LazyModule(new TLXbar)
   private val tpMetaSinkNode = l2cache.tpmeta_source_node.map(_.makeSink())
   private val tpMetaSourceNode = l2cache.tpmeta_sink_node.map(n => BundleBridgeSource(n.genOpt.get))
-  l2cache.tpmeta_sink_node.map(_ := tpMetaSourceNode.get)
+  l2cache.tpmeta_sink_node.foreach(_ := tpMetaSourceNode.get)
+  private val prefetchSourceNode = l2cache.pf_recv_node.map(n => BundleBridgeSource(n.genOpt.get))
+  l2cache.pf_recv_node.foreach(_ := prefetchSourceNode.get)
 
   cXBar.node :*= l1iNode
   cXBar.node :*= l1dNode
@@ -67,7 +71,10 @@ class Top(implicit p: Parameters) extends LazyModule {
     val l1i = l1iNode.makeIOs()
     val mmio = mmioNode.makeIOs()
     val chi = IO(l2cache.module.io_chi.cloneType)
+    val prefetch = prefetchSourceNode.map(_.makeIOs())
+    val tlb = IO(l2cache.module.io.l2_tlb_req.cloneType)
 
+    l2cache.module.io.l2_tlb_req <> tlb
     l2cache.module.io_chi <> chi
     l2cache.module.io.hartId := 0.U
     l2cache.module.io.pfCtrlFromCore := DontCare
@@ -82,7 +89,12 @@ class Top(implicit p: Parameters) extends LazyModule {
 }
 
 class TopConfig extends Config((up, here, site) => {
-  case L2ParamKey => L2Param(ways = 8, sets = 1024, FPGAPlatform = true, clientCaches = Seq(L1Param(sets = 128, ways = 4)))
+  case L2ParamKey => L2Param(
+    ways = 8,
+    sets = 1024,
+    FPGAPlatform = true,
+    prefetch = Seq(BOPParameters(), PrefetchReceiverParams()),
+    clientCaches = Seq(L1Param(sets = 128, ways = 4, vaddrBitsOpt = Some(48))))
   case CHIIssue => Issue.Eb
   case EnableCHI => true
   case BankBitsKey => 1
