@@ -35,15 +35,15 @@ class Top(implicit p: Parameters) extends LazyModule {
       responseKeys = cacheParams.respKey
     )
   ))
-  // TODO:SET mmioNode optional
-  private val mmioNode = TLClientNode(Seq(
+  private val mmioNode: Option[TLClientNode] = if (cacheParams.enableMmio)  Some(TLClientNode(Seq(
     TLMasterPortParameters.v1(
       clients = Seq(TLMasterParameters.v1(
         name = "uncache",
         sourceId = IdRange(0, 16)
       ))
-    )
-  ))
+    ))
+  )) else None
+
   private val l1iNode = TLClientNode(Seq(
     TLMasterPortParameters.v1(
       clients = Seq(TLMasterParameters.v1(
@@ -63,13 +63,19 @@ class Top(implicit p: Parameters) extends LazyModule {
   cXBar.node :*= l1iNode
   cXBar.node :*= l1dNode
   l2cache.managerNode :=* TLXbar() :=* BankBinder(2, 64) :*= l2cache.node :*= TLBuffer() :*= cXBar.node
-  l2cache.mmioNode :*= mmioNode
+  l2cache.mmioNode.foreach { l2mmio =>
+    mmioNode.foreach { node =>
+      l2mmio :*= node  // 使用 Option 中的节点来连接
+    }
+  }
+
+
 
   lazy val module = new Impl
   class Impl extends LazyModuleImp(this) {
     val l1d = l1dNode.makeIOs()
     val l1i = l1iNode.makeIOs()
-    val mmio = mmioNode.makeIOs()
+    val mmio = mmioNode.foreach{_.makeIOs()}
     val chi = IO(l2cache.module.io_chi.cloneType)
     val prefetch = prefetchSourceNode.map(_.makeIOs())
     val tlb = IO(l2cache.module.io.l2_tlb_req.cloneType)

@@ -78,6 +78,7 @@ case class L2Param(
    * 3 for all
    */
   mmioBridgeSize: Int = 8,
+  enableMmio: Boolean = true,
 
   // Client
   echoField: Seq[BundleFieldBase] = Nil,

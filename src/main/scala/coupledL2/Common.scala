@@ -251,6 +251,7 @@ class RespInfoBundle(implicit p: Parameters) extends L2Bundle
   val respErr = chiOpt.map(_ => UInt(RESPERR_WIDTH.W))
   val traceTag = chiOpt.map(_ => Bool())
   val dataCheckErr = chiOpt.map(_ => Bool())
+  val cBusy = chiOpt.map(_ => UInt(CBUSY_WIDTH.W))
 }
 
 class RespBundle(implicit p: Parameters) extends L2Bundle {
