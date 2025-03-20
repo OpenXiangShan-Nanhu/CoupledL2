@@ -4,7 +4,6 @@ import chisel3._
 import chisel3.stage.ChiselGeneratorAnnotation
 import circt.stage.{ChiselStage, FirtoolOption}
 import coupledL2._
-import coupledL2.prefetch.{BOPParameters, PrefetchReceiverParams}
 import coupledL2.tl2chi.{CHIIssue, Issue, PortIO, TL2CHICoupledL2}
 import freechips.rocketchip.diplomacy.{IdRange, TransferSizes}
 import freechips.rocketchip.tile.MaxHartIdBits
@@ -14,6 +13,7 @@ import org.chipsalliance.diplomacy.lazymodule.{LazyModule, LazyModuleImp}
 import org.chipsalliance.diplomacy.DisableMonitors
 import org.chipsalliance.cde.config.{Config, Parameters}
 import xs.utils.common.{AliasField, PrefetchField}
+import coupledL2.prefetch.{BOPParameters, PrefetchReceiverParams}
 import xs.utils.perf.{LogUtilsOptions, LogUtilsOptionsKey, PerfCounterOptions, PerfCounterOptionsKey, XSPerfLevel}
 
 class Top(implicit p: Parameters) extends LazyModule {
@@ -56,6 +56,7 @@ class Top(implicit p: Parameters) extends LazyModule {
   private val cXBar = LazyModule(new TLXbar)
   private val tpMetaSinkNode = l2cache.tpmeta_source_node.map(_.makeSink())
   private val tpMetaSourceNode = l2cache.tpmeta_sink_node.map(n => BundleBridgeSource(n.genOpt.get))
+  // l2cache.tpmeta_sink_node.map(_ := tpMetaSourceNode.get)
   l2cache.tpmeta_sink_node.foreach(_ := tpMetaSourceNode.get)
   private val prefetchSourceNode = l2cache.pf_recv_node.map(n => BundleBridgeSource(n.genOpt.get))
   l2cache.pf_recv_node.foreach(_ := prefetchSourceNode.get)
@@ -65,7 +66,7 @@ class Top(implicit p: Parameters) extends LazyModule {
   l2cache.managerNode :=* TLXbar() :=* BankBinder(2, 64) :*= l2cache.node :*= TLBuffer() :*= cXBar.node
   l2cache.mmioNode.foreach { l2mmio =>
     mmioNode.foreach { node =>
-      l2mmio :*= node  // 使用 Option 中的节点来连接
+      l2mmio :*= node
     }
   }
 
@@ -75,7 +76,7 @@ class Top(implicit p: Parameters) extends LazyModule {
   class Impl extends LazyModuleImp(this) {
     val l1d = l1dNode.makeIOs()
     val l1i = l1iNode.makeIOs()
-    val mmio = mmioNode.foreach{_.makeIOs()}
+    val mmio = mmioNode.map(_.makeIOs())
     val chi = IO(l2cache.module.io_chi.cloneType)
     val prefetch = prefetchSourceNode.map(_.makeIOs())
     val tlb = IO(l2cache.module.io.l2_tlb_req.cloneType)
@@ -95,12 +96,13 @@ class Top(implicit p: Parameters) extends LazyModule {
 }
 
 class TopConfig extends Config((up, here, site) => {
+  // case L2ParamKey => L2Param(ways = 8, sets = 1024, FPGAPlatform = true, clientCaches = Seq(L1Param(sets = 128, ways = 4)))
   case L2ParamKey => L2Param(
-    ways = 8,
-    sets = 1024,
-    FPGAPlatform = true,
-    prefetch = Seq(BOPParameters(), PrefetchReceiverParams()),
-    clientCaches = Seq(L1Param(sets = 128, ways = 4, vaddrBitsOpt = Some(48))))
+     ways = 8,
+     sets = 1024,
+     FPGAPlatform = true,
+     prefetch     = Seq(BOPParameters(), PrefetchReceiverParams()),
+     clientCaches = Seq(L1Param(sets = 128, ways = 4, vaddrBitsOpt = Some(48))))
   case CHIIssue => Issue.Eb
   case EnableCHI => true
   case BankBitsKey => 1

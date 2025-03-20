@@ -75,8 +75,8 @@ class TL2CHICoupledL2(implicit p: Parameters) extends CoupledL2Base {
     val io_chi = IO(new DecoupledPortIO)
     val io_nodeID = IO(Input(UInt())) 
 
-    //prefetchreq blocker
-    // val prefBlocker = Module(new PrefetchReqBlocker()(pftParams))
+    // prefetchreq blocker
+    val prefBlocker = Module(new PrefetchReqBlocker()(pftParams))
 
 
     println(s"MMIO:")
@@ -258,16 +258,24 @@ class TL2CHICoupledL2(implicit p: Parameters) extends CoupledL2Base {
         rxrsp <> io_chi.rx.rsp
         rxdat <> io_chi.rx.dat
     }
-    //reqblocker->slice
-    // slices.zipWithIndex.foreach{
-    //   case(s,i)=>
-    //     //Prefetcher->reqblocker
-    //     prefBlocker.io.reqFromPref := prefetcher.get.io.req.bits
-    //     val lowTwoBits = io_chi.rx.rsp.bits.cBusy(1, 0)
-    //     val isBusy = lowTwoBits =/= "b00".U
-    //     prefBlocker.io.block := isBusy
-    //     s.io.prefetch.get.req.bits:= prefBlocker.io.reqToSlice
-    // }
+    // reqblocker->slice
+    slices.zipWithIndex.foreach{
+      case(s,i)=>
+        //Prefetcher->reqblocker
+        prefBlocker.io.reqFromPref := prefetcher.get.io.req.bits
+        val loadStateRxRsp  = io_chi.rx.rsp.bits.cBusy(1, 0)
+        val loadStateRxDat  = io_chi.rx.dat.bits.cBusy(1, 0)
+        val isBusyFromRxRsp = (loadStateRxRsp === LdState.High) || (loadStateRxRsp === LdState.Critical)
+        val isBusyFromRxDat = (loadStateRxDat === LdState.High) || (loadStateRxDat === LdState.Critical)
+        val isBusy = isBusyFromRxRsp || isBusyFromRxDat
+        prefBlocker.io.block := isBusy
+        s.io.prefetch.get.req.bits:= prefBlocker.io.reqToSlice
+
+        def bank_eq(set: UInt, bankId: Int, bankBits: Int): Bool = {
+          if(bankBits == 0) true.B else set(bankBits - 1, 0) === bankId.U
+        }
+        s.io.prefetch.get.req.valid:=Mux(isBusy, false.B, prefetcher.get.io.req.valid && bank_eq(Cat(prefetcher.get.io.req.bits.tag, prefetcher.get.io.req.bits.set), i, bankBits))
+    }
   }
 
   lazy val module = new CoupledL2Imp(this)
