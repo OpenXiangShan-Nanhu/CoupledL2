@@ -28,6 +28,8 @@ import org.chipsalliance.cde.config.{Parameters, Field}
 import scala.math.max
 import coupledL2._
 import coupledL2.prefetch._
+import coupledL2.tl2chi.PrefetchReqBlocker
+import freechips.rocketchip.diplomacy.BufferParams.default
 
 abstract class TL2CHIL2Bundle(implicit val p: Parameters) extends Bundle
   with HasCoupledL2Parameters
@@ -62,37 +64,31 @@ class TL2CHICoupledL2(implicit p: Parameters) extends CoupledL2Base {
   )
   val managerNode = TLManagerNode(Seq(managerParameters))
 
-  val mmioBridge = LazyModule(new MMIOBridge)
-  val mmioNode = mmioBridge.mmioNode
+  // val mmioBridge = if(cacheParams.enableMmio)  LazyModule(new MMIOBridge) else None
+  // val mmioNode = if(cacheParams.enableMmio) Some(mmioBridge.mmioNode) else None
+  val mmioBridge = if (cacheParams.enableMmio) Some(LazyModule(new MMIOBridge)) else None
+  val mmioNode = mmioBridge.map(_.mmioNode)
 
   class CoupledL2Imp(wrapper: LazyModule) extends BaseCoupledL2Imp(wrapper)
     with HasCHIOpcodes {
 
-    val io_chi = IO(new PortIO)
-    val io_nodeID = IO(Input(UInt()))
+    val io_chi = IO(new DecoupledPortIO)
+    val io_nodeID = IO(Input(UInt())) 
 
-    // Check port width
-    require(io_chi.tx.rsp.getWidth == io_chi.rx.rsp.getWidth);
-    require(io_chi.tx.dat.getWidth == io_chi.rx.dat.getWidth);
+    // prefetchreq blocker
+    val prefBlocker = Module(new PrefetchReqBlocker()(pftParams))
 
-    // Display info
-    println(s"CHI Issue Version: ${p(CHIIssue)}")
-    println(s"CHI REQ Flit Width: ${io_chi.tx.req.flit.getWidth}")
-    println(s"CHI RSP Flit Width: ${io_chi.tx.rsp.flit.getWidth}")
-    println(s"CHI SNP Flit Width: ${io_chi.rx.snp.flit.getWidth}")
-    println(s"CHI DAT Flit Width: ${io_chi.rx.dat.flit.getWidth}")
-    println(s"CHI Port Width: ${io_chi.getWidth}")
 
     println(s"MMIO:")
-    mmioNode.edges.in.headOption.foreach { n =>
-      n.client.clients.zipWithIndex.foreach {
+    mmioNode.map(_.edges.in.headOption).foreach { n =>
+      n.map(_.client.clients).zipWithIndex.foreach {
         case (c, i) =>
-          println(s"\t${i} <= ${c.name};" +
-            s"\tsourceRange: ${c.sourceId.start}~${c.sourceId.end}")
+          println(s"\t${i} <= ${c.map(_.name)};" +
+            s"\tsourceRange: ${c.map(_.sourceId.start)}~${c.map(_.sourceId.end)}")
       }
     }
 
-    val mmio = mmioBridge.module
+    val mmio = mmioBridge.map(_.module)
 
     // Outer interface connection
     /**
@@ -130,9 +126,9 @@ class TL2CHICoupledL2(implicit p: Parameters) extends CoupledL2Base {
         val txreq_arb = Module(new RRArbiterInit(new CHIREQ, slices.size + 1)) // plus 1 for MMIO
         val txreq = Wire(DecoupledIO(new CHIREQ))
         slices.zip(txreq_arb.io.in.init).foreach { case (s, in) => in <> s.io.out.tx.req }
-        txreq_arb.io.in.last <> mmio.io.tx.req
+        txreq_arb.io.in.last <> mmio.map(_.io.tx.req).getOrElse(WireDefault(0.U.asTypeOf(Decoupled(new CHIREQ))))
         txreq <> txreq_arb.io.out
-        txreq.bits.txnID := setSliceID(txreq_arb.io.out.bits.txnID, txreq_arb.io.chosen, mmio.io.tx.req.fire)
+        txreq.bits.txnID := setSliceID(txreq_arb.io.out.bits.txnID, txreq_arb.io.chosen, mmio.map(_.io.tx.req.fire).getOrElse(false.B))
 
         // TXRSP
         val txrsp = Wire(DecoupledIO(new CHIRSP))
@@ -140,7 +136,7 @@ class TL2CHICoupledL2(implicit p: Parameters) extends CoupledL2Base {
 
         // TXDAT
         val txdat = Wire(DecoupledIO(new CHIDAT))
-        arb(slices.map(_.io.out.tx.dat) :+ mmio.io.tx.dat, txdat, Some("txdat"))
+        arb(slices.map(_.io.out.tx.dat) :+ mmio.map(_.io.tx.dat).getOrElse(WireDefault(0.U.asTypeOf(DecoupledIO(new CHIDAT)))), txdat, Some("txdat"))
 
         // RXSNP
         val rxsnp = Wire(DecoupledIO(new CHISNP))
@@ -159,7 +155,7 @@ class TL2CHICoupledL2(implicit p: Parameters) extends CoupledL2Base {
         // PCredit queue
         class EmptyBundle extends Bundle
 
-        val (mmioQuerys, mmioGrants) = mmio.io_pCrd.map { case x => (x.query, x.grant) }.unzip
+        val (mmioQuerys, mmioGrants) = mmio.map(_.io_pCrd).map { case x => (x.map(_.query), x.map(_.grant)) }.getOrElse((Seq.empty, Seq.empty))
         val (slicesQuerys, slicesGrants) = slices.map { case s =>
           (s.io_pCrd.map(_.query), s.io_pCrd.map(_.grant))
         }.unzip
@@ -219,12 +215,14 @@ class TL2CHICoupledL2(implicit p: Parameters) extends CoupledL2Base {
           s.io.out.rx.rsp.bits := rxrsp.bits
           s.io.out.rx.rsp.bits.txnID := restoreTXNID(rxrsp.bits.txnID)
         }
-        mmio.io.rx.rsp.valid := rxrsp.valid && rxrspIsMMIO && !isPCrdGrant
-        mmio.io.rx.rsp.bits := rxrsp.bits
-        mmio.io.rx.rsp.bits.txnID := restoreTXNID(rxrsp.bits.txnID)
+        mmio.foreach{ mmio =>
+          mmio.io.rx.rsp.valid := rxrsp.valid && rxrspIsMMIO && !isPCrdGrant
+          mmio.io.rx.rsp.bits := rxrsp.bits
+          mmio.io.rx.rsp.bits.txnID := restoreTXNID(rxrsp.bits.txnID)
+        }
         rxrsp.ready := rxrsp.bits.opcode === PCrdGrant || Mux(
           rxrspIsMMIO,
-          mmio.io.rx.rsp.ready,
+          mmio.map(_.io.rx.rsp.ready).getOrElse(false.B),
           Cat(slices.zipWithIndex.map { case (s, i) => s.io.out.rx.rsp.ready && rxrspSliceID === i.U }).orR
         )
 
@@ -237,25 +235,46 @@ class TL2CHICoupledL2(implicit p: Parameters) extends CoupledL2Base {
           s.io.out.rx.dat.bits := rxdat.bits
           s.io.out.rx.dat.bits.txnID := restoreTXNID(rxdat.bits.txnID)
         }
-        mmio.io.rx.dat.valid := rxdat.valid && rxdatIsMMIO
-        mmio.io.rx.dat.bits := rxdat.bits
-        mmio.io.rx.dat.bits.txnID := restoreTXNID(rxdat.bits.txnID)
+        mmio.foreach{ mmio =>
+          mmio.io.rx.dat.valid := rxdat.valid && rxdatIsMMIO
+          mmio.io.rx.dat.bits := rxdat.bits
+          mmio.io.rx.dat.bits.txnID := restoreTXNID(rxdat.bits.txnID)
+        }
         rxdat.ready := Mux(
           rxdatIsMMIO,
-          mmio.io.rx.dat.ready,
+          mmio.map(_.io.rx.dat.ready).getOrElse(false.B),
           Cat(slices.zipWithIndex.map { case (s, i) => s.io.out.rx.dat.ready && rxdatSliceID === i.U}).orR
         )
+        def setSrcID[T <: Bundle](in: DecoupledIO[T], srcID: UInt = 0.U): DecoupledIO[T] = {
+          val out = Wire(in.cloneType)
+          out                                               <> in
+          out.bits.elements.filter(_._1 == "srcID").head._2 := srcID
+          out
+         }
+        io_chi.tx.req <> setSrcID(txreq, io_nodeID)
+        io_chi.tx.rsp <> setSrcID(txrsp, io_nodeID)
+        io_chi.tx.dat <> setSrcID(txdat, io_nodeID)
+        rxsnp <> io_chi.rx.snp
+        rxrsp <> io_chi.rx.rsp
+        rxdat <> io_chi.rx.dat
+    }
+    // reqblocker->slice
+    slices.zipWithIndex.foreach{
+      case(s,i)=>
+        //Prefetcher->reqblocker
+        prefBlocker.io.reqFromPref := prefetcher.get.io.req.bits
+        val loadStateRxRsp  = io_chi.rx.rsp.bits.cBusy(1, 0)
+        val loadStateRxDat  = io_chi.rx.dat.bits.cBusy(1, 0)
+        val isBusyFromRxRsp = (loadStateRxRsp === LdState.High) || (loadStateRxRsp === LdState.Critical)
+        val isBusyFromRxDat = (loadStateRxDat === LdState.High) || (loadStateRxDat === LdState.Critical)
+        val isBusy = isBusyFromRxRsp || isBusyFromRxDat
+        prefBlocker.io.block := isBusy
+        s.io.prefetch.get.req.bits:= prefBlocker.io.reqToSlice
 
-        val linkMonitor = Module(new LinkMonitor)
-        linkMonitor.io.in.tx.req <> txreq
-        linkMonitor.io.in.tx.rsp <> txrsp
-        linkMonitor.io.in.tx.dat <> txdat
-        rxsnp <> linkMonitor.io.in.rx.snp
-        rxrsp <> linkMonitor.io.in.rx.rsp
-        rxdat <> linkMonitor.io.in.rx.dat
-        io_chi <> linkMonitor.io.out
-        linkMonitor.io.nodeID := io_nodeID
-        linkMonitor.io.exitco.foreach{_ := Cat(slices.zipWithIndex.map { case (s, i) => s.io.l2FlushDone.getOrElse(false.B)}).andR} //exit coherency
+        def bank_eq(set: UInt, bankId: Int, bankBits: Int): Bool = {
+          if(bankBits == 0) true.B else set(bankBits - 1, 0) === bankId.U
+        }
+        s.io.prefetch.get.req.valid:=Mux(isBusy, false.B, prefetcher.get.io.req.valid && bank_eq(Cat(prefetcher.get.io.req.bits.tag, prefetcher.get.io.req.bits.set), i, bankBits))
     }
   }
 
