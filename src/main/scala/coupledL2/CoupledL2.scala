@@ -34,7 +34,7 @@ import org.chipsalliance.cde.config.{Field, Parameters}
 import scala.math.max
 import coupledL2.prefetch._
 import freechips.rocketchip.diplomacy.{IdRange, RegionType, TransferSizes}
-import xs.utils.common.{TPmetaReq, TPmetaResp}
+import xs.utils.common.{PrefetchRecv, TPmetaReq, TPmetaResp}
 import xs.utils.mbist.{MbistInterface, MbistPipeline}
 import xs.utils.sram.{SramBroadcastBundle, SramHelper}
 
@@ -602,10 +602,10 @@ abstract class CoupledL2Base(implicit p: Parameters) extends LazyModule with Has
     val okHint = grant_data_fire.orR && hintPipe1.io.out.valid && hintPipe1.io.out.bits === grant_data_source
     XSPerfAccumulate("ok2Hints", okHint)
 
-    private val sigFromSrams = if (cacheParams.hasMbist) Some(SramHelper.genBroadCastBundleTop()) else None
-
     private val mbistPl = MbistPipeline.PlaceMbistPipeline(Int.MaxValue, "L2Cache", cacheParams.hasMbist)
     private val l2MbistIntf = if (cacheParams.hasMbist) {
+      val brc = SramHelper.genBroadCastBundleTop()
+      brc := io.dft.get
       val params = mbistPl.get.nodeParams
       val intf = Some(Module(new MbistInterface(
         params = Seq(params),

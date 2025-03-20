@@ -346,13 +346,6 @@ class PrefetchCtrlFromCore extends Bundle {
   val l2_tp_en = Bool()
 }
 
-class PrefetchRecv extends Bundle {
-  val addr = UInt(64.W)
-  val pf_source = UInt(MemReqSource.reqSourceBits.W)
-  val addr_valid = Bool()
-  val l2_pf_en = Bool()
-}
-
 // custom l2 - l1 interface
 class L2ToL1Hint(implicit p: Parameters) extends Bundle {
   val sourceId = UInt(32.W)    // tilelink sourceID
