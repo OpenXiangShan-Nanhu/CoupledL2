@@ -26,6 +26,7 @@ import coupledL2.{MSHRInfo, MergeTaskBundle, MetaEntry, TaskBundle}
 import coupledL2.MetaData._
 import xs.utils.ParallelOR
 import xs.utils.tl.MemReqSource
+import xs.utils.debug.HardwareAssertion
 
 class RXSNP(
   lCreditNum: Int = 4 // the number of L-Credits that a receiver can provide
@@ -35,6 +36,11 @@ class RXSNP(
     val task = DecoupledIO(new TaskBundle())
     val msInfo = Vec(mshrsAll, Flipped(ValidIO(new MSHRInfo())))
   })
+  /* ======== HardwareAssertion ======== */
+  val hwaFlags = Array.fill(3)(Wire(Bool()))
+  for (i <- 0 until 3) {
+    hwaFlags(i) := true.B
+  }
 
   val rxsnp = Wire(io.rxsnp.cloneType)
   val queue = Module(new Queue(io.rxsnp.bits.cloneType, 2, flow = false))
@@ -111,7 +117,7 @@ class RXSNP(
     Mux(hit, ms.bits.meta, MetaEntry())
   }})
 
-  assert(PopCount(replaceNestSnpMask) <= 1.U, "multiple replace nest snoop")
+  hwaFlags(0) := PopCount(replaceNestSnpMask) <= 1.U
 
   task := fromSnpToTaskBundle(rxsnp.bits)
 
@@ -128,11 +134,9 @@ class RXSNP(
   }
 
   val STALL_CNT_MAX = 28000.U
-  assert(stallCnt <= STALL_CNT_MAX,
-    "stallCnt full! maybe there is a deadlock! addr => 0x%x req_opcode => %d txn_id => %d",
-    rxsnp.bits.addr, rxsnp.bits.opcode, rxsnp.bits.txnID)
+  hwaFlags(1) := stallCnt <= STALL_CNT_MAX
 
-  assert(!(stall && rxsnp.fire))
+  hwaFlags(2) := !(stall && rxsnp.fire)
 
   def fromSnpToTaskBundle(snp: CHISNP): TaskBundle = {
     val task = WireInit(0.U.asTypeOf(new TaskBundle))
@@ -188,4 +192,9 @@ class RXSNP(
     task
   }
 
+  /* ======== HardwareAssertion ======== */
+  HardwareAssertion(hwaFlags(0), cf"multiple replace nest snoop")
+  HardwareAssertion(hwaFlags(1), cf"stallCnt full! maybe there is a deadlock! addr => [0x${rxsnp.bits.addr}] req_opcode => [0x${rxsnp.bits.opcode}] txn_id => [0x${rxsnp.bits.txnID}]",rxsnp.bits.addr, rxsnp.bits.opcode, rxsnp.bits.txnID)
+  HardwareAssertion(hwaFlags(2))
+  HardwareAssertion.placePipe(Int.MaxValue-2)
 }

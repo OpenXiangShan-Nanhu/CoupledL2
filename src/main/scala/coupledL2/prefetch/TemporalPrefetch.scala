@@ -37,6 +37,7 @@ import coupledL2.utils.ReplacementPolicy
 import xs.utils.common.{TPmetaReq, TPmetaResp}
 import xs.utils.sram.SRAMTemplate
 import xs.utils.tl.MemReqSource
+import xs.utils.debug.HardwareAssertion
 
 case class TPParameters(
     tpTableEntries: Int = 16384,
@@ -127,6 +128,11 @@ class TemporalPrefetch(implicit p: Parameters) extends TPModule {
     val tpmeta_port = new tpmetaPortIO(hartIdLen, fullAddressBits, offsetBits)
     val hartid = Input(UInt(hartIdLen.W))
   })
+  /* ======== HardwareAssertion ======== */
+  val hwaFlags = Array.fill(6)(Wire(Bool()))
+  for (i <- 0 until 6) {
+    hwaFlags(i) := true.B
+  }
 
   def parseVaddr(x: UInt): (UInt, UInt) = {
     (x(x.getWidth-1, tpTableSetBits), x(tpTableSetBits-1, 0))
@@ -173,7 +179,8 @@ class TemporalPrefetch(implicit p: Parameters) extends TPModule {
   val enable = io.enable && cstEnable.orR
 
   if (vaddrBitsOpt.isEmpty) {
-    assert(!trainOnVaddr)
+    // assert(!trainOnVaddr)
+    hwaFlags(1) := !trainOnVaddr
   }
 
   /* Stage 0: query tpMetaTable */
@@ -259,7 +266,7 @@ class TemporalPrefetch(implicit p: Parameters) extends TPModule {
 
   tpDataQueue.io.enq.valid := io.tpmeta_port.resp.valid && io.tpmeta_port.resp.bits.hartid === io.hartid
   tpDataQueue.io.enq.bits.rawData := io.tpmeta_port.resp.bits.rawData
-  assert(tpDataQueue.io.enq.ready === true.B) // tpDataQueue is never full
+  hwaFlags(2) := tpDataQueue.io.enq.ready === true.B
 
 
   /* Recorder logic TODO: compress data based on max delta */
@@ -275,13 +282,13 @@ class TemporalPrefetch(implicit p: Parameters) extends TPModule {
   when(dorecord_s2) {
     recorder_idx := recorder_idx + 1.U
     recorder_data(recorder_idx) := record_data_in >> offsetBits.U // eliminate cacheline offset
-    assert((record_data_in >> offsetBits.U)(fullAddressBits - 1, metaDataLength) === 0.U)
+    hwaFlags(3) := (record_data_in >> offsetBits.U)(fullAddressBits - 1, metaDataLength) === 0.U
     when(recorder_idx === (recordThres-1.U)) {
       write_record := true.B
       recorder_idx := 0.U
       write_record_trigger := triggerQueue.io.deq.bits
       triggerQueue.io.deq.ready := true.B
-      assert(triggerQueue.io.deq.valid)
+      hwaFlags(4) := triggerQueue.io.deq.valid
     }
   }
   when(write_record) {
@@ -289,7 +296,7 @@ class TemporalPrefetch(implicit p: Parameters) extends TPModule {
   }
 
   val tpTable_w_valid = write_record
-  assert(RegNext(s2_valid, false.B) || !tpTable_w_valid, "tpTable_w_valid can only be true in s3")
+  hwaFlags(5) := RegNext(s2_valid, false.B) || !tpTable_w_valid
 
   val (write_record_vtag, write_record_vset) = parseVaddr(write_record_trigger.vaddr)
   val (write_record_ptag, write_record_pset) = parsePaddr(write_record_trigger.paddr)
@@ -314,7 +321,7 @@ class TemporalPrefetch(implicit p: Parameters) extends TPModule {
   dataWriteQueue.io.enq.bits.set := tpTable_w_set
   dataWriteQueue.io.enq.bits.way := tpTable_w_way
   dataWriteQueue.io.enq.bits.hartid := io.hartid
-  assert(dataWriteQueue.io.enq.ready === true.B) // TODO: support back-pressure
+  hwaFlags(0) := dataWriteQueue.io.enq.ready === true.B
 
   when(resetIdx === 0.U) {
     resetFinish := true.B
@@ -395,4 +402,13 @@ class TemporalPrefetch(implicit p: Parameters) extends TPModule {
   triggerDB.log(triggerPt, tpTable_w_valid, "", clock, reset)
   trainDB.log(trainPt, s2_valid, "", clock, reset)
   sendDB.log(sendPt, io.req.fire, "", clock, reset)
+  /* ======== HardwareAssertion ======== */
+  HardwareAssertion(hwaFlags(0))
+  HardwareAssertion(hwaFlags(1))
+  HardwareAssertion(hwaFlags(2))
+  HardwareAssertion(hwaFlags(3))
+  HardwareAssertion(hwaFlags(4))
+  HardwareAssertion(hwaFlags(5),cf"tpTable_w_valid can only be true in s3")
+
+  HardwareAssertion.placePipe(Int.MaxValue-2)
 }

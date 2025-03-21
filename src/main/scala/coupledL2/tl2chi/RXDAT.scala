@@ -22,6 +22,7 @@ import chisel3.util._
 import org.chipsalliance.cde.config.Parameters
 import coupledL2.{MSHRBufWrite, RespBundle}
 import xs.utils.SECDEDCode
+import xs.utils.debug.HardwareAssertion
 
 class RXDAT(implicit p: Parameters) extends TL2CHIL2Module {
   val io = IO(new Bundle() {
@@ -29,6 +30,11 @@ class RXDAT(implicit p: Parameters) extends TL2CHIL2Module {
     val in = Output(new RespBundle())
     val refillBufWrite = ValidIO(new MSHRBufWrite())
   })
+  /* ======== HardwareAssertion ======== */
+  val hwaFlags = Array.fill(1)(Wire(Bool()))
+  for (i <- 0 until 1) {
+    hwaFlags(i) := true.B
+  }
 
   /* RXDAT for Transactions: CompData */
 
@@ -52,7 +58,8 @@ class RXDAT(implicit p: Parameters) extends TL2CHIL2Module {
     false.B
   }
   val poison = io.out.bits.poison.getOrElse(false.B).orR
-  assert(!(dataCheck && io.out.valid), "RXDAT(cached) should not have DataCheck error")
+  // assert(!(dataCheck && io.out.valid), "RXDAT(cached) should not have DataCheck error")
+  hwaFlags(0) := !(dataCheck && io.out.valid)
 
   /* Write Refill Buffer*/
   io.refillBufWrite.valid := io.out.valid
@@ -86,4 +93,8 @@ class RXDAT(implicit p: Parameters) extends TL2CHIL2Module {
 
   io.out.ready := true.B
 
+
+  /* ======== HardwareAssertion ======== */
+  HardwareAssertion(hwaFlags(0), cf"RXDAT(cached) should not have DataCheck error")
+  HardwareAssertion.placePipe(Int.MaxValue-2)
 }

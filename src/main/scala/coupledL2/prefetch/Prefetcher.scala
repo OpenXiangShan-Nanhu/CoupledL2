@@ -25,6 +25,7 @@ import coupledL2._
 import xs.utils.{ChiselDB, HasCircularQueuePtrHelper, ParallelPriorityMux, Pipeline, RegNextN, ValidIODelay}
 import xs.utils.perf.{XSPerfAccumulate, XSPerfHistogram}
 import xs.utils.tl.MemReqSource
+import xs.utils.debug.HardwareAssertion
 
 /* virtual address */
 trait HasPrefetcherHelper extends HasCircularQueuePtrHelper with HasCoupledL2Parameters {
@@ -236,6 +237,11 @@ class Prefetcher(implicit p: Parameters) extends PrefetchModule {
   val tpio = IO(new Bundle() {
     val tpmeta_port = if (hasTPPrefetcher) Some(new tpmetaPortIO(hartIdLen, fullAddressBits, offsetBits)) else None
   })
+  /* ======== HardwareAssertion ======== */
+  val hwaFlags = Array.fill(1)(Wire(Bool()))
+  for (i <- 0 until 1) {
+    hwaFlags(i) := true.B
+  }
   val hartId = IO(Input(UInt(hartIdLen.W)))
   val pfCtrlFromCore = IO(Input(new PrefetchCtrlFromCore))
 
@@ -324,11 +330,15 @@ class Prefetcher(implicit p: Parameters) extends PrefetchModule {
     pfRcv.get.io.tlb_req.resp.valid := false.B
     pfRcv.get.io.tlb_req.resp.bits := DontCare
     pfRcv.get.io.tlb_req.pmp_resp := DontCare
-    assert(!pfRcv.get.io.req.valid ||
-      pfRcv.get.io.req.bits.pfSource === MemReqSource.Prefetch2L2SMS.id.U ||
-      pfRcv.get.io.req.bits.pfSource === MemReqSource.Prefetch2L2Stream.id.U ||
-      pfRcv.get.io.req.bits.pfSource === MemReqSource.Prefetch2L2Stride.id.U
-    )
+    // assert(!pfRcv.get.io.req.valid ||
+    //   pfRcv.get.io.req.bits.pfSource === MemReqSource.Prefetch2L2SMS.id.U ||
+    //   pfRcv.get.io.req.bits.pfSource === MemReqSource.Prefetch2L2Stream.id.U ||
+    //   pfRcv.get.io.req.bits.pfSource === MemReqSource.Prefetch2L2Stride.id.U
+    // )
+    hwaFlags(0) := !pfRcv.get.io.req.valid || 
+                    pfRcv.get.io.req.bits.pfSource === MemReqSource.Prefetch2L2SMS.id.U || 
+                    pfRcv.get.io.req.bits.pfSource === MemReqSource.Prefetch2L2Stream.id.U || 
+                    pfRcv.get.io.req.bits.pfSource === MemReqSource.Prefetch2L2Stride.id.U
   }
   if (hasTPPrefetcher) {
     tp.get.io.enable := tp_en
@@ -426,4 +436,8 @@ class Prefetcher(implicit p: Parameters) extends PrefetchModule {
     site = "L2Prefetch_onlyBOP",
     clock, reset
   )
+  /* ======== HardwareAssertion ======== */
+  HardwareAssertion(hwaFlags(0))
+
+  HardwareAssertion.placePipe(Int.MaxValue-1)
 }

@@ -25,6 +25,7 @@ import org.chipsalliance.cde.config.Parameters
 import xs.utils.RRArbiterInit
 import xs.utils.perf.XSPerfAccumulate
 import xs.utils.tl.MemReqSource
+import xs.utils.debug.{DomainInfo, HardwareAssertion}
 
 class PipeBufferResp(implicit p: Parameters) extends L2Bundle {
   val data = Vec(beatSize, UInt((beatBytes * 8).W))
@@ -44,6 +45,12 @@ class SinkC(implicit p: Parameters) extends L2Module {
     val refillBufWrite = ValidIO(new MSHRBufWrite)
     val msInfo = Vec(mshrsAll, Flipped(ValidIO(new MSHRInfo)))
   })
+
+  /* ======== HardwareAssertion ======== */
+  val hwaFlags = Array.fill(1)(Wire(Bool()))
+  for (i <- 0 until 1) {
+    hwaFlags(i) := true.B
+  }
 
   val (first, last, _, beat) = edgeIn.count(io.c)
   val isRelease = io.c.bits.opcode(1)
@@ -112,7 +119,7 @@ class SinkC(implicit p: Parameters) extends L2Module {
         dataBuf(nextPtr)(beat) := io.c.bits.data
         beatValids(nextPtr)(beat) := true.B
       }.otherwise {
-        assert(last)
+        hwaFlags(0):=last
         dataBuf(nextPtrReg)(beat) := io.c.bits.data
         beatValids(nextPtrReg)(beat) := true.B
       }
@@ -201,4 +208,9 @@ class SinkC(implicit p: Parameters) extends L2Module {
   XSPerfAccumulate("NewDataNestC", io.refillBufWrite.valid)
   //!!WARNING: TODO: if this is zero, that means fucntion [Release-new-data written into refillBuf]
   // is never tested, and may have flaws
+
+  /* ======== HardwareAssertion ======== */
+  HardwareAssertion(hwaFlags(0))
+
+  HardwareAssertion.placePipe(Int.MaxValue-2)
 }

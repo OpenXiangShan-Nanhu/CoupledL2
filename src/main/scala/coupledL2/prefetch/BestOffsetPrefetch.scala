@@ -38,6 +38,7 @@ import scopt.Read
 import freechips.rocketchip.util.SeqToAugmentedSeq
 import xs.utils.sram.SRAMTemplate
 import xs.utils.tl.MemReqSource
+import xs.utils.debug.HardwareAssertion
 
 case class BOPParameters(
   virtualTrain: Boolean = true,
@@ -156,6 +157,12 @@ class RecentRequestTable(name: String)(implicit p: Parameters) extends BOPModule
     val r = Flipped(new TestOffsetBundle)
   })
 
+  /* ======== HardwareAssertion ======== */
+  val hwaFlags = Array.fill(1)(Wire(Bool()))
+  for (i <- 0 until 1) {
+    hwaFlags(i) := true.B
+  }
+
   // RR table is direct mapped, accessed through a hash function, each entry holding a partial tag.
   //        +----------+---------------+---------------+----------------------+
   // paddr: |  ......  |  8-bit hash2  |  8-bit hash1  |  6-bit cache offset  |
@@ -189,7 +196,7 @@ class RecentRequestTable(name: String)(implicit p: Parameters) extends BOPModule
   rrTable.io.r.req.bits.setIdx := idx(rAddr)
   rData := rrTable.io.r.resp.data(0)
 
-  assert(!RegNext(io.w.fire && io.r.req.fire), "single port SRAM should not read and write at the same time")
+  hwaFlags(0) := !RegNext(io.w.fire && io.r.req.fire)
 
   /** s0: req handshake */
   val s0_valid = rrTable.io.r.req.fire
@@ -214,6 +221,8 @@ class RecentRequestTable(name: String)(implicit p: Parameters) extends BOPModule
   e.addr := wAddr
   wrrt.log(e, io.w.valid && !io.r.req.valid, site = "RecentRequestTable", clock, reset)
 
+  /* ======== HardwareAssertion ======== */
+  HardwareAssertion(hwaFlags(0),"single port SRAM should not read and write at the same time")
 }
 
 class OffsetScoreTable(name: String = "")(implicit p: Parameters) extends BOPModule {

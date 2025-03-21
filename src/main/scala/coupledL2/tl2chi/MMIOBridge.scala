@@ -27,6 +27,7 @@ import freechips.rocketchip.tilelink.TLMessages._
 import coupledL2.HasCoupledL2Parameters
 import coupledL2.{MemBackTypeMM, MemPageTypeNC}
 import xs.utils.{ParallelLookUp, ParallelPriorityMux, RRArbiterInit, SECDEDCode, ZeroExt}
+import xs.utils.debug.HardwareAssertion
 
 class MMIOBridge()(implicit p: Parameters) extends LazyModule
   with HasCoupledL2Parameters
@@ -83,7 +84,14 @@ class MMIOBridgeEntry(edge: TLEdgeIn)(implicit p: Parameters) extends TL2CHIL2Mo
     val id = Input(UInt())
     val pCrd = new PCrdQueryBundle
     val waitOnReadReceipt = Option.when(needRR)(Output(Bool()))
+    val hwaFlag = Output(Bool())
   })
+
+  /* ======== HardwareAssertion ======== */
+  val hwaFlags = Array.fill(1)(Wire(Bool()))
+  for (i <- 0 until 1) {
+    hwaFlags(i) := true.B
+  }
 
   val s_txreq = RegInit(true.B)
   val s_ncbwrdata = RegInit(true.B)
@@ -171,7 +179,7 @@ class MMIOBridgeEntry(edge: TLEdgeIn)(implicit p: Parameters) extends TL2CHIL2Mo
       false.B
     }
     val poison = rxdat.bits.poison.getOrElse(false.B).orR
-    assert(!dataCheck, "UC should not have DataCheck error")
+    hwaFlags(0) := !dataCheck
     denied := denied || nderr
     corrupt := corrupt || derr || nderr || dataCheck || poison
   }
@@ -317,6 +325,8 @@ class MMIOBridgeEntry(edge: TLEdgeIn)(implicit p: Parameters) extends TL2CHIL2Mo
   io.pCrd.query.bits.srcID := srcID
 
   io.waitOnReadReceipt.foreach(_ := !w_readreceipt.get && s_txreq)
+
+  io.hwaFlag := hwaFlags(0)
 }
 
 class MMIOBridgeImp(outer: MMIOBridge) extends LazyModuleImp(outer)
@@ -334,6 +344,14 @@ class MMIOBridgeImp(outer: MMIOBridge) extends LazyModuleImp(outer)
     ready -> (1 << i).U
   }).asBools
 
+  /* ======== HardwareAssertion ======== */
+  val hwaFlags = Array.fill(2)(Wire(Bool()))
+  for (i <- 0 until 2) {
+    hwaFlags(i) := true.B
+  }
+
+  val wireArray =  Array.fill(mmioBridgeSize)(Wire(Bool()))
+  val entryIdx = Wire(UInt(log2Ceil(mmioBridgeSize).W))
   /**
     * When a ReadNoSnp requires RequestOrder or Endpoint Order, the requester requires a ReadReceipt to determine
     * when it can send the next ordered request.
@@ -358,7 +376,9 @@ class MMIOBridgeImp(outer: MMIOBridge) extends LazyModuleImp(outer)
     entry.io.chi.rx.rsp.bits := io.rx.rsp.bits
 
     entry.io.id := i.U
+    wireArray(i) := entry.io.hwaFlag
   }
+  entryIdx := OHToUInt(wireArray)
 
   val txreqArb = Module(new RRArbiterInit(chiselTypeOf(io.tx.req.bits), mmioBridgeSize))
   for ((a, req) <- txreqArb.io.in.zip(entries.map(_.io.chi.tx.req))) {
@@ -379,9 +399,16 @@ class MMIOBridgeImp(outer: MMIOBridge) extends LazyModuleImp(outer)
     entry.io.chi.rx.dat.ready && io.rx.dat.bits.txnID === i.U
   }).orR
   io.rx.rsp.ready := true.B
-  assert(!io.rx.rsp.valid || Cat(entries.zipWithIndex.map { case (entry, i) =>
-    entry.io.chi.rx.rsp.ready && io.rx.rsp.bits.txnID === i.U }).orR)
+  hwaFlags(0) := !io.rx.rsp.valid || Cat(entries.zipWithIndex.map { case (entry, i) => entry.io.chi.rx.rsp.ready && io.rx.rsp.bits.txnID === i.U }).orR
+  hwaFlags(1) := wireArray.reduce(_||_)
 
   dontTouch(io)
   dontTouch(bus)
+
+
+  /* ======== HardwareAssertion ======== */
+  HardwareAssertion(hwaFlags(0))
+  HardwareAssertion(hwaFlags(1), cf"should only be one nestedwbData, MMIOBridgeEntry_${entryIdx}")
+
+  HardwareAssertion.placePipe(Int.MaxValue-1)
 }

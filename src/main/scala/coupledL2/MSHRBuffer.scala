@@ -21,7 +21,7 @@ import chisel3._
 import chisel3.util._
 import org.chipsalliance.cde.config.Parameters
 import coupledL2.utils._
-
+import xs.utils.debug.{DomainInfo, HardwareAssertion}
 class MSHRBufRead(implicit p: Parameters) extends L2Bundle {
   val id = Output(UInt(mshrBits.W))
 }
@@ -46,10 +46,16 @@ class MSHRBuffer(wPorts: Int = 1)(implicit p: Parameters) extends L2Module {
 
   val buffer = Reg(Vec(mshrsAll, Vec(beatSize, UInt((beatBytes * 8).W))))
 
+  /* ======== HardwareAssertion ======== */
+  val hwaFlags = Array.fill(1)(Wire(Bool()))
+  for (i <- 0 until 1) {
+    hwaFlags(i) := true.B
+  }
+
   buffer.zipWithIndex.foreach {
     case (block, i) =>
       val wens = VecInit(io.w.map(w => w.valid && w.bits.id === i.U)).asUInt
-      assert(PopCount(wens) <= 2.U, "triple write to the same MSHR buffer entry")
+      hwaFlags(0) := PopCount(wens) <= 2.U
 
       val w_data = PriorityMux(wens, io.w.map(_.bits.data))
       val w_beatSel = PriorityMux(wens, io.w.map(_.bits.beatMask))
@@ -63,6 +69,14 @@ class MSHRBuffer(wPorts: Int = 1)(implicit p: Parameters) extends L2Module {
 
   val rdata = buffer(io.r.bits.id).asUInt
   io.resp.data.data := RegEnable(rdata, 0.U.asTypeOf(rdata), io.r.valid)
+
+
+
+  /* ======== HardwareAssertion ======== */
+  HardwareAssertion(hwaFlags(0),cf"triple write to the same MSHR buffer entry")
+
+  HardwareAssertion.placePipe(Int.MaxValue-2)
+
 }
 
 // may consider just choose an empty entry to insert

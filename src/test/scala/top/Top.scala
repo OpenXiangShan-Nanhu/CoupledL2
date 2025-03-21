@@ -88,6 +88,7 @@ class Top(implicit p: Parameters) extends LazyModule {
     l2cache.module.io_nodeID := 0.U
     l2cache.module.io.debugTopDown := DontCare
     l2cache.module.io.l2_tlb_req <> DontCare
+    l2cache.module.assertionOut <> DontCare
     dontTouch(l2cache.module.io)
 
     tpMetaSinkNode.foreach(_.in.head._1.ready := true.B)

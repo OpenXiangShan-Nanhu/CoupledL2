@@ -22,7 +22,7 @@ import chisel3.util._
 import org.chipsalliance.cde.config.Parameters
 import xs.utils.mbist.MbistPipeline
 import coupledL2.utils.SplittedSRAM
-
+import xs.utils.debug.{DomainInfo, HardwareAssertion}
 class DSRequest(implicit p: Parameters) extends L2Bundle {
   val way = UInt(wayBits.W)
   val set = UInt(setBits.W)
@@ -64,6 +64,11 @@ class DataStorage(implicit p: Parameters) extends L2Module {
     val rdata = Output(new DSBlock)
     val wdata = Input(new DSBlock)
   })
+  /* ======== HardwareAssertion ======== */
+  val hwaFlags = Array.fill(3)(Wire(Bool()))
+  for (i <- 0 until 3) {
+    hwaFlags(i) := true.B
+  }
 
   // read data is set MultiCycle Path 2
   val array = Module(new SplittedSRAM(
@@ -119,12 +124,16 @@ class DataStorage(implicit p: Parameters) extends L2Module {
   io.rdata := dataRead
   io.error := error
 
-  assert(!io.en || !RegNext(io.en, false.B),
-    "Continuous SRAM req prohibited under MCP2!")
+  hwaFlags(0) := !io.en || !RegNext(io.en, false.B)
+  hwaFlags(1) := !(RegNext(io.en) && (io.req.asUInt =/= RegNext(io.req.asUInt)))
+  hwaFlags(2) := !(RegNext(io.en && io.req.bits.wen) && (io.wdata.asUInt =/= RegNext(io.wdata.asUInt)))
 
-  assert(!(RegNext(io.en) && (io.req.asUInt =/= RegNext(io.req.asUInt))),
-    s"DataStorage req fails to hold for 2 cycles!")
 
-  assert(!(RegNext(io.en && io.req.bits.wen) && (io.wdata.asUInt =/= RegNext(io.wdata.asUInt))),
-    s"DataStorage wdata fails to hold for 2 cycles!")
+  /* ======== HardwareAssertion ======== */
+  HardwareAssertion(hwaFlags(0), cf"Continuous SRAM req prohibited under MCP2!")
+  HardwareAssertion(hwaFlags(1), cf"DataStorage req fails to hold for 2 cycles!")
+  HardwareAssertion(hwaFlags(2), cf"DataStorage wdata fails to hold for 2 cycles!")
+
+
+  HardwareAssertion.placePipe(Int.MaxValue-2)
 }

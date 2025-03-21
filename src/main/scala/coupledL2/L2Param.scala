@@ -100,6 +100,7 @@ case class L2Param(
   hartId: Int = 0,
   // Prefetch
   prefetch: Seq[PrefetchParameters] = Nil,
+  blockCircle: Int = 200,
   // L2 Flush
   enableL2Flush: Boolean = false,
   // Performance analysis

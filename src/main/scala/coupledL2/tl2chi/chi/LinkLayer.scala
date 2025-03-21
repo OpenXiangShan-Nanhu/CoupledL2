@@ -21,6 +21,7 @@ import chisel3._
 import chisel3.util._
 import org.chipsalliance.cde.config.Parameters
 import coupledL2.L2Module
+import xs.utils.debug.HardwareAssertion
 
 class ChannelIO[+T <: Data](gen: T) extends Bundle {
   // Flit Pending. Early indication that a flit might be transmitted in the following cycle
@@ -138,6 +139,12 @@ class LCredit2Decoupled[T <: Bundle](
     val state = Input(new LinkState())
     val reclaimLCredit = Output(Bool())
   })
+
+  /* ======== HardwareAssertion ======== */
+  val hwaFlags = Array.fill(33)(Wire(Bool()))
+  for (i <- 0 until 33) {
+    hwaFlags(i) := true.B
+  }
 
   require(lcreditNum <= 15)
 

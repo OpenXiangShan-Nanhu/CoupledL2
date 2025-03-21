@@ -28,6 +28,7 @@ import coupledL2._
 import xs.utils.{ParallelOR, ParallelPriorityMux}
 import xs.utils.perf.HasPerfEvents
 import xs.utils.tl.MemReqSource
+import xs.utils.debug.HardwareAssertion
 
 class MSHRCtl(implicit p: Parameters) extends TL2CHIL2Module with HasCHIOpcodes with HasPerfEvents {
   val io = IO(new Bundle() {
@@ -89,7 +90,11 @@ class MSHRCtl(implicit p: Parameters) extends TL2CHIL2Module with HasCHIOpcodes 
     /* for TopDown */
     val l2Miss = Output(Bool())
   })
-
+  /* ======== HardwareAssertion ======== */
+  val hwaFlags = Array.fill(16)(Wire(Bool()))
+  for (i <- 0 until 16) {
+    hwaFlags(i) := true.B
+  }
   /*MSHR allocation pointer gen -> to Mainpipe*/
   class MSHRSelector(implicit p: Parameters) extends L2Module {
     val io = IO(new Bundle() {
@@ -184,7 +189,8 @@ class MSHRCtl(implicit p: Parameters) extends TL2CHIL2Module with HasCHIOpcodes 
   io.nestedwbDataId.bits := ParallelPriorityMux(mshrs.zipWithIndex.map {
     case (mshr, i) => (mshr.io.nestedwbData, i.U)
   })
-  assert(RegNext(PopCount(mshrs.map(_.io.nestedwbData)) <= 1.U), "should only be one nestedwbData")
+  // assert(RegNext(PopCount(mshrs.map(_.io.nestedwbData)) <= 1.U), "should only be one nestedwbData")
+  hwaFlags(0) := RegNext(PopCount(mshrs.map(_.io.nestedwbData)) <= 1.U)
 
 
   /* Status for topDown monitor */
@@ -254,5 +260,41 @@ class MSHRCtl(implicit p: Parameters) extends TL2CHIL2Module with HasCHIOpcodes 
     ("l2_cache_long_miss", lmiss.reduce(_ + _))
   )
   generatePerfEvent()
+
+ 
+  /* ======== HardwareAssertion ======== */
+  val entryIdx = Array.fill(15)(Wire(UInt(log2Ceil(mshrsAll).W)))
+  val wireArray = Array.fill(15)(Wire(Vec(mshrsAll, Bool())))
+  mshrs.zipWithIndex.foreach { case (mshrsEntry, i) =>
+    mshrsEntry.io.hwaFlags.zipWithIndex.foreach{ case (hwaFlag, j) =>
+      wireArray(j)(i) := hwaFlag
+    }
+  }
+  for (i <- 0 until 15) {
+    hwaFlags(i + 1) := wireArray(i).reduce(_||_)
+  }
+  for (i <- 0 until 15) {
+    entryIdx(i) := OHToUInt(wireArray(i))
+  }
+
+  /* ======== HardwareAssertion ======== */
+  HardwareAssertion(hwaFlags(0), cf"should only be one nestedwbData")
+  HardwareAssertion(hwaFlags(1), cf"directory valid read with dirty under non-T state, mshrs_${entryIdx(0)}")
+  HardwareAssertion(hwaFlags(2), cf"specification failure: received SnpUniqueStash with RetToSrc = 1, mshrs_${entryIdx(1)}")
+  HardwareAssertion(hwaFlags(3), cf"specification failure: received SnpQuery with RetToSrc = 1, mshrs_${entryIdx(2)}")
+  HardwareAssertion(hwaFlags(4), cf"MSHR can not receive prefetch hit req, mshrs_${entryIdx(3)}")
+  HardwareAssertion(hwaFlags(5), cf"refill not allowed on CMO operation, mshrs_${entryIdx(4)}")
+  HardwareAssertion(hwaFlags(6), cf"invalid Resp, mshrs_${entryIdx(5)}")
+  HardwareAssertion(hwaFlags(7), cf"invalid Resp, mshrs_${entryIdx(6)}")
+  HardwareAssertion(hwaFlags(8), cf"invalid combination of Resp and FwdState, mshrs_${entryIdx(7)}")
+  HardwareAssertion(hwaFlags(9), cf"mshrs_${entryIdx(8)}")
+  HardwareAssertion(hwaFlags(10), cf"mshrs_${entryIdx(9)}")
+  HardwareAssertion(hwaFlags(11), cf"There should be no CopyBackWrData after Evict, mshrs_${entryIdx(10)}")
+  HardwareAssertion(hwaFlags(12), cf"There must be a CopyBackWrData after WriteBack, mshrs_${entryIdx(11)}")
+  HardwareAssertion(hwaFlags(13), cf"There must be a CopyBackWrData after WriteClean, mshrs_${entryIdx(12)}")
+  HardwareAssertion(hwaFlags(14), cf"There must be a CopyBackWrData after WriteEvictFull, mshrs_${entryIdx(13)}")
+  HardwareAssertion(hwaFlags(15), cf"mshrs_${entryIdx(14)}")
+
+  HardwareAssertion.placePipe(Int.MaxValue-1)
 }
 

@@ -52,5 +52,4 @@ class RXRSP(implicit p: Parameters) extends TL2CHIL2Module {
   io.in.respInfo.cBusy.get     := io.out.bits.cBusy
 
   io.out.ready := true.B
-
 }
