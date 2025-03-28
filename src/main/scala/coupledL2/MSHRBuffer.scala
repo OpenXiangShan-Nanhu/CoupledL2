@@ -75,7 +75,7 @@ class MSHRBuffer(wPorts: Int = 1)(implicit p: Parameters) extends L2Module {
   /* ======== HardwareAssertion ======== */
   HardwareAssertion(hwaFlags(0),cf"triple write to the same MSHR buffer entry")
 
-  HardwareAssertion.placePipe(Int.MaxValue-2)
+  HardwareAssertion.placePipe(2)
 
 }
 

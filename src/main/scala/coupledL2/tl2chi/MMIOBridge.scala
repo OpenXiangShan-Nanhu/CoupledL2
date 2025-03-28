@@ -410,5 +410,5 @@ class MMIOBridgeImp(outer: MMIOBridge) extends LazyModuleImp(outer)
   HardwareAssertion(hwaFlags(0))
   HardwareAssertion(hwaFlags(1), cf"should only be one nestedwbData, MMIOBridgeEntry_${entryIdx}")
 
-  HardwareAssertion.placePipe(Int.MaxValue-1)
+  HardwareAssertion.placePipe(3)
 }

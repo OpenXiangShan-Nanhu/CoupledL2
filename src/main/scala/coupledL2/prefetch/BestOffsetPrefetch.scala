@@ -223,6 +223,7 @@ class RecentRequestTable(name: String)(implicit p: Parameters) extends BOPModule
 
   /* ======== HardwareAssertion ======== */
   HardwareAssertion(hwaFlags(0),"single port SRAM should not read and write at the same time")
+  HardwareAssertion.placePipe(2)
 }
 
 class OffsetScoreTable(name: String = "")(implicit p: Parameters) extends BOPModule {

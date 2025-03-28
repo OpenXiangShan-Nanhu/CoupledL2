@@ -135,5 +135,5 @@ class DataStorage(implicit p: Parameters) extends L2Module {
   HardwareAssertion(hwaFlags(2), cf"DataStorage wdata fails to hold for 2 cycles!")
 
 
-  HardwareAssertion.placePipe(Int.MaxValue-2)
+  HardwareAssertion.placePipe(2)
 }

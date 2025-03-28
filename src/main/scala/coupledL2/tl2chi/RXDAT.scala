@@ -96,5 +96,5 @@ class RXDAT(implicit p: Parameters) extends TL2CHIL2Module {
 
   /* ======== HardwareAssertion ======== */
   HardwareAssertion(hwaFlags(0), cf"RXDAT(cached) should not have DataCheck error")
-  HardwareAssertion.placePipe(Int.MaxValue-2)
+  HardwareAssertion.placePipe(2)
 }

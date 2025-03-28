@@ -295,6 +295,6 @@ class MSHRCtl(implicit p: Parameters) extends TL2CHIL2Module with HasCHIOpcodes 
   HardwareAssertion(hwaFlags(14), cf"There must be a CopyBackWrData after WriteEvictFull, mshrs_${entryIdx(13)}")
   HardwareAssertion(hwaFlags(15), cf"mshrs_${entryIdx(14)}")
 
-  HardwareAssertion.placePipe(Int.MaxValue-1)
+  HardwareAssertion.placePipe(2)
 }
 

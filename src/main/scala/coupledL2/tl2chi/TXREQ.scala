@@ -87,5 +87,5 @@ class TXREQ(implicit p: Parameters) extends TL2CHIL2Module {
   /* ======== HardwareAssertion ======== */
   HardwareAssertion(hwaFlags(0), cf"TXREQ should always be ready for pipeline req")
   HardwareAssertion(hwaFlags(1), cf"in-flight overflow at TXREQ")
-  HardwareAssertion.placePipe(Int.MaxValue-2)
+  HardwareAssertion.placePipe(2)
 }

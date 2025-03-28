@@ -194,7 +194,7 @@ class RXSNP(
 
   /* ======== HardwareAssertion ======== */
   HardwareAssertion(hwaFlags(0), cf"multiple replace nest snoop")
-  HardwareAssertion(hwaFlags(1), cf"stallCnt full! maybe there is a deadlock! addr => [0x${rxsnp.bits.addr}] req_opcode => [0x${rxsnp.bits.opcode}] txn_id => [0x${rxsnp.bits.txnID}]",rxsnp.bits.addr, rxsnp.bits.opcode, rxsnp.bits.txnID)
+  HardwareAssertion(hwaFlags(1), cf"stallCnt full! maybe there is a deadlock! addr => [0x${rxsnp.bits.addr}] req_opcode => [0x${rxsnp.bits.opcode}] txn_id => [0x${rxsnp.bits.txnID}]")
   HardwareAssertion(hwaFlags(2))
-  HardwareAssertion.placePipe(Int.MaxValue-2)
+  HardwareAssertion.placePipe(2)
 }

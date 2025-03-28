@@ -212,5 +212,5 @@ class SinkC(implicit p: Parameters) extends L2Module {
   /* ======== HardwareAssertion ======== */
   HardwareAssertion(hwaFlags(0))
 
-  HardwareAssertion.placePipe(Int.MaxValue-2)
+  HardwareAssertion.placePipe(2)
 }

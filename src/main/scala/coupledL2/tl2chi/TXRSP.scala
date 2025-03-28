@@ -102,5 +102,5 @@ class TXRSP(implicit p: Parameters) extends TL2CHIL2Module {
   HardwareAssertion(hwaFlags(1), cf"TXRSP should never be full")
   HardwareAssertion(hwaFlags(2), cf"in-flight overflow at TXRSP")
 
-  HardwareAssertion.placePipe(Int.MaxValue-2)
+  HardwareAssertion.placePipe(2)
 }

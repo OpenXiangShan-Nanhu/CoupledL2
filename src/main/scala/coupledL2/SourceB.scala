@@ -138,5 +138,5 @@ class SourceB(implicit p: Parameters) extends L2Module {
   /* ======== HardwareAssertion ======== */
   HardwareAssertion(hwaFlags(0))
 
-  HardwareAssertion.placePipe(Int.MaxValue-3)
+  HardwareAssertion.placePipe(1)
 }

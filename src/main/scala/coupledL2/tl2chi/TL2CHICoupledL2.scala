@@ -24,7 +24,7 @@ import freechips.rocketchip.diplomacy._
 import freechips.rocketchip.tilelink._
 import org.chipsalliance.cde.config.Parameters
 import xs.utils.RRArbiterInit
-
+import xs.utils.debug.HardwareAssertion
 abstract class TL2CHIL2Bundle(implicit val p: Parameters) extends Bundle
   with HasCoupledL2Parameters
   with HasCHIMsgParameters
@@ -269,6 +269,7 @@ class TL2CHICoupledL2(implicit p: Parameters) extends CoupledL2Base {
         }
         s.io.prefetch.get.req.valid:=Mux(prefBlocker.io.alreadyBlock, false.B, prefetcher.get.io.req.valid && bank_eq(Cat(prefetcher.get.io.req.bits.tag, prefetcher.get.io.req.bits.set), i, bankBits))
     }
+    HardwareAssertion.placePipe(4)
   }
 
   lazy val module = new CoupledL2Imp(this)

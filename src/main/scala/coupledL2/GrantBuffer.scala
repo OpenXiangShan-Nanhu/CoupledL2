@@ -356,6 +356,6 @@ class GrantBuffer(implicit p: Parameters) extends L2Module {
   HardwareAssertion(hwaFlags(3),cf"GrantBuf: e.sink overflow inflightGrant size")
   HardwareAssertion(hwaFlags(4),cf"Inflight Grant Leak")
 
-  HardwareAssertion.placePipe(Int.MaxValue-2)
+  HardwareAssertion.placePipe(2)
 
 }

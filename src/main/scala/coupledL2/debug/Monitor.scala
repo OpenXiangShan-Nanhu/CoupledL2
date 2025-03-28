@@ -109,5 +109,5 @@ class Monitor(implicit p: Parameters) extends L2Module {
   HardwareAssertion(hwaFlags(0), cf"Trunk should have some client hit")
   HardwareAssertion(hwaFlags(1), cf"Invalid Client should not send Release")
 
-  HardwareAssertion.placePipe(Int.MaxValue-1)
+  HardwareAssertion.placePipe(2)
 }

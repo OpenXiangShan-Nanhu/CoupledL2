@@ -90,7 +90,6 @@ class Top(implicit p: Parameters) extends LazyModule {
     l2cache.module.io_nodeID := 0.U
     l2cache.module.io.debugTopDown := DontCare
     l2cache.module.io.l2_tlb_req <> DontCare
-    l2cache.module.assertionOut <> DontCare
     dontTouch(l2cache.module.io)
 
     tpMetaSinkNode.foreach(_.in.head._1.ready := true.B)
@@ -99,7 +98,8 @@ class Top(implicit p: Parameters) extends LazyModule {
     private val assertionNode = HardwareAssertion.placePipe(Int.MaxValue, moduleTop = true)
     HardwareAssertion.release(assertionNode, "hwa", "cpl2")
     assertionNode.assertion.ready := true.B
-    val hwa = Option.when(p(HardwareAssertionKey).enable)(Decoupled(assertionNode.assertion.bits.cloneType))
+    // val hwa = Option.when(p(HardwareAssertionKey).enable)(Decoupled(assertionNode.assertion.bits.cloneType))
+    val hwa = Option.when(p(HardwareAssertionKey).enable)(IO(Decoupled(assertionNode.assertion.bits.cloneType)))
     if(p(HardwareAssertionKey).enable) {
       hwa.get <> assertionNode.assertion
       dontTouch(hwa.get)

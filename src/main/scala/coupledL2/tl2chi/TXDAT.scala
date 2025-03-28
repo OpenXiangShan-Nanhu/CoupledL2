@@ -191,5 +191,5 @@ class TXDAT(implicit p: Parameters) extends TL2CHIL2Module with HasCHIOpcodes {
   HardwareAssertion(hwaFlags(0), cf"txChannel is wrong for TXDAT")
   HardwareAssertion(hwaFlags(1), cf"in-flight overflow at TXREQ")
   HardwareAssertion(hwaFlags(2), cf"in-flight overflow at TXDAT")
-  HardwareAssertion.placePipe(Int.MaxValue-2)
+  HardwareAssertion.placePipe(2)
 }

@@ -133,5 +133,5 @@ class CustomL1Hint(implicit p: Parameters) extends L2Module {
   HardwareAssertion(hwaFlags(1), cf"hintQueue should never be full")
 
 
-  HardwareAssertion.placePipe(Int.MaxValue-2)
+  HardwareAssertion.placePipe(1)
 }

@@ -439,5 +439,5 @@ class Prefetcher(implicit p: Parameters) extends PrefetchModule {
   /* ======== HardwareAssertion ======== */
   HardwareAssertion(hwaFlags(0))
 
-  HardwareAssertion.placePipe(Int.MaxValue-1)
+  HardwareAssertion.placePipe(3)
 }

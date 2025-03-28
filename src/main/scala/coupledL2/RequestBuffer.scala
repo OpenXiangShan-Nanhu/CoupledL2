@@ -337,5 +337,5 @@ class RequestBuffer(flow: Boolean = true, entries: Int = 4)(implicit p: Paramete
   HardwareAssertion(hwaFlags(0))
   HardwareAssertion(hwaFlags(1),cf"ReqBuf Leak")
 
-  HardwareAssertion.placePipe(Int.MaxValue-2)
+  HardwareAssertion.placePipe(2)
 }

@@ -178,10 +178,7 @@ class TemporalPrefetch(implicit p: Parameters) extends TPModule {
   private val trainOnL1PF = Constantin.createRecord("tp_trainOnL1PF"+hartid.toString, initValue = 0)
   val enable = io.enable && cstEnable.orR
 
-  if (vaddrBitsOpt.isEmpty) {
-    // assert(!trainOnVaddr)
-    hwaFlags(1) := !trainOnVaddr
-  }
+  hwaFlags(1) := Mux(vaddrBitsOpt.isEmpty.B, !trainOnVaddr, false.B)
 
   /* Stage 0: query tpMetaTable */
 
@@ -410,5 +407,5 @@ class TemporalPrefetch(implicit p: Parameters) extends TPModule {
   HardwareAssertion(hwaFlags(4))
   HardwareAssertion(hwaFlags(5),cf"tpTable_w_valid can only be true in s3")
 
-  HardwareAssertion.placePipe(Int.MaxValue-2)
+  HardwareAssertion.placePipe(2)
 }
