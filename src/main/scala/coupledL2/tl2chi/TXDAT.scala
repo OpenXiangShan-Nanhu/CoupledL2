@@ -23,6 +23,7 @@ import org.chipsalliance.cde.config.Parameters
 import coupledL2.{DSBeat, DSBlock, TaskBundle, TaskWithData}
 import coupledL2.tl2chi.CHICohStates._
 import xs.utils.{ParallelPriorityMux, SECDEDCode}
+import xs.utils.debug.HardwareAssertion
 
 class TXDATBlockBundle(implicit p: Parameters) extends TXBlockBundle {
   val blockSinkBReqEntrance = Bool()
@@ -38,9 +39,14 @@ class TXDAT(implicit p: Parameters) extends TL2CHIL2Module with HasCHIOpcodes {
     val pipeStatusVec = Flipped(Vec(5, ValidIO(new PipeStatusWithCHI)))
     val toReqArb = Output(new TXDATBlockBundle)
   })
+  /* ======== HardwareAssertion ======== */
+  val hwaFlags = Array.fill(3)(Wire(Bool()))
+  for (i <- 0 until 3) {
+    hwaFlags(i) := true.B
+  }
 
-  assert(!io.in.valid || io.in.bits.task.toTXDAT, "txChannel is wrong for TXDAT")
-  assert(!io.in.valid || io.in.ready, "TXDAT should never be full")
+  hwaFlags(0) := !io.in.valid || io.in.bits.task.toTXDAT
+  hwaFlags(1) := !io.in.valid || io.in.ready
   require(chiOpt.isDefined)
   require(beatBytes * 8 == DATA_WIDTH)
 
@@ -71,7 +77,7 @@ class TXDAT(implicit p: Parameters) extends TL2CHIL2Module with HasCHIOpcodes {
     PopCount(Cat(pipeStatus_s2.map(s => s.valid && Mux(s.bits.mshrTask, s.bits.toTXDAT, s.bits.fromB)))) +
     queueCnt
 
-  assert(inflightCnt <= mshrsAll.U, "in-flight overflow at TXDAT")
+  hwaFlags(2) := inflightCnt <= mshrsAll.U
 
   val noSpaceForSinkBReq = inflightCnt >= mshrsAll.U
   val noSpaceForMSHRReq = inflightCnt >= (mshrsAll-2).U
@@ -181,4 +187,9 @@ class TXDAT(implicit p: Parameters) extends TL2CHIL2Module with HasCHIOpcodes {
     dat
   }
 
+  /* ======== HardwareAssertion ======== */
+  HardwareAssertion(hwaFlags(0), cf"txChannel is wrong for TXDAT")
+  HardwareAssertion(hwaFlags(1), cf"in-flight overflow at TXREQ")
+  HardwareAssertion(hwaFlags(2), cf"in-flight overflow at TXDAT")
+  HardwareAssertion.placePipe(Int.MaxValue-2)
 }

@@ -19,17 +19,11 @@ package coupledL2.tl2chi
 
 import chisel3._
 import chisel3.util._
-import xs.utils.{FastArbiter, Pipeline, ParallelPriorityMux, RegNextN, RRArbiterInit}
+import coupledL2._
 import freechips.rocketchip.diplomacy._
 import freechips.rocketchip.tilelink._
-import freechips.rocketchip.tilelink.TLMessages._
-import freechips.rocketchip.util._
-import org.chipsalliance.cde.config.{Parameters, Field}
-import scala.math.max
-import coupledL2._
-import coupledL2.prefetch._
-import coupledL2.tl2chi.PrefetchReqBlocker
-import freechips.rocketchip.diplomacy.BufferParams.default
+import org.chipsalliance.cde.config.Parameters
+import xs.utils.RRArbiterInit
 
 abstract class TL2CHIL2Bundle(implicit val p: Parameters) extends Bundle
   with HasCoupledL2Parameters
@@ -73,8 +67,7 @@ class TL2CHICoupledL2(implicit p: Parameters) extends CoupledL2Base {
     with HasCHIOpcodes {
 
     val io_chi = IO(new DecoupledPortIO)
-    val io_nodeID = IO(Input(UInt())) 
-
+    val io_nodeID = IO(Input(UInt()))
     // prefetchreq blocker
     val prefBlocker = Module(new PrefetchReqBlocker()(pftParams))
 
@@ -265,16 +258,16 @@ class TL2CHICoupledL2(implicit p: Parameters) extends CoupledL2Base {
         prefBlocker.io.reqFromPref := prefetcher.get.io.req.bits
         val loadStateRxRsp  = io_chi.rx.rsp.bits.cBusy(1, 0)
         val loadStateRxDat  = io_chi.rx.dat.bits.cBusy(1, 0)
-        val isBusyFromRxRsp = (loadStateRxRsp === LdState.High) || (loadStateRxRsp === LdState.Critical)
-        val isBusyFromRxDat = (loadStateRxDat === LdState.High) || (loadStateRxDat === LdState.Critical)
+        val isBusyFromRxRsp = io_chi.rx.rsp.fire & ((loadStateRxRsp === LdState.High) || (loadStateRxRsp === LdState.Critical))
+        val isBusyFromRxDat = io_chi.rx.dat.fire & ((loadStateRxDat === LdState.High) || (loadStateRxDat === LdState.Critical))
         val isBusy = isBusyFromRxRsp || isBusyFromRxDat
-        prefBlocker.io.block := isBusy
+        prefBlocker.io.shouldBlock := isBusy
         s.io.prefetch.get.req.bits:= prefBlocker.io.reqToSlice
 
         def bank_eq(set: UInt, bankId: Int, bankBits: Int): Bool = {
           if(bankBits == 0) true.B else set(bankBits - 1, 0) === bankId.U
         }
-        s.io.prefetch.get.req.valid:=Mux(isBusy, false.B, prefetcher.get.io.req.valid && bank_eq(Cat(prefetcher.get.io.req.bits.tag, prefetcher.get.io.req.bits.set), i, bankBits))
+        s.io.prefetch.get.req.valid:=Mux(prefBlocker.io.alreadyBlock, false.B, prefetcher.get.io.req.valid && bank_eq(Cat(prefetcher.get.io.req.bits.tag, prefetcher.get.io.req.bits.set), i, bankBits))
     }
   }
 

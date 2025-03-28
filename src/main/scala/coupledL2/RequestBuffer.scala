@@ -24,7 +24,7 @@ import chisel3._
 import chisel3.util._
 import xs.utils.FastArbiter
 import xs.utils.perf.{XSPerfAccumulate, XSPerfHistogram, XSPerfMax}
-
+import xs.utils.debug.{DomainInfo, HardwareAssertion}
 class ReqEntry(entries: Int = 4)(implicit p: Parameters) extends L2Bundle() {
   val valid    = Bool()
   val rdy      = Bool()
@@ -88,6 +88,11 @@ class RequestBuffer(flow: Boolean = true, entries: Int = 4)(implicit p: Paramete
     val hasLatePF = Output(Bool())
     val hasMergeA = Output(Bool())
   })
+  /* ======== HardwareAssertion ======== */
+  val hwaFlags = Array.fill(2)(Wire(Bool()))
+  for (i <- 0 until 2) {
+    hwaFlags(i) := true.B
+  }
 
   /* ======== Data Structure ======== */
 
@@ -212,7 +217,7 @@ class RequestBuffer(flow: Boolean = true, entries: Int = 4)(implicit p: Paramete
     entry.waitMS  := conflictMask(in)
 
 //    entry.depMask := depMask
-    assert(PopCount(conflictMaskFromA(in)) <= 2.U)
+    hwaFlags(0) := (PopCount(conflictMaskFromA(in)) <= 2.U)
   }
 
   /* ======== Issue ======== */
@@ -315,7 +320,8 @@ class RequestBuffer(flow: Boolean = true, entries: Int = 4)(implicit p: Paramete
       case (e, t) =>
         when(e.valid) { t := t + 1.U }
         when(RegNext(RegNext(e.valid) && !e.valid)) { t := 0.U }
-        assert(t < 20000.U, "ReqBuf Leak")
+        // assert(t < 20000.U, "ReqBuf Leak")
+        hwaFlags(1) := t < 20000.U
 
         val enable = RegNext(e.valid) && !e.valid
         XSPerfHistogram("reqBuf_timer", t, enable, 0, 20, 1, right_strict = true)
@@ -325,4 +331,11 @@ class RequestBuffer(flow: Boolean = true, entries: Int = 4)(implicit p: Paramete
         // assert !(all entries occupied for 100 cycles)
     }
   }
+
+
+  /* ======== HardwareAssertion ======== */
+  HardwareAssertion(hwaFlags(0))
+  HardwareAssertion(hwaFlags(1),cf"ReqBuf Leak")
+
+  HardwareAssertion.placePipe(Int.MaxValue-2)
 }

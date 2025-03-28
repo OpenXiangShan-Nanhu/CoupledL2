@@ -2,6 +2,7 @@ package top
 
 import chisel3._
 import chisel3.stage.ChiselGeneratorAnnotation
+import chisel3.util.Decoupled
 import circt.stage.{ChiselStage, FirtoolOption}
 import coupledL2._
 import coupledL2.tl2chi.{CHIIssue, Issue, PortIO, TL2CHICoupledL2}
@@ -14,6 +15,8 @@ import org.chipsalliance.diplomacy.DisableMonitors
 import org.chipsalliance.cde.config.{Config, Parameters}
 import xs.utils.common.{AliasField, PrefetchField}
 import coupledL2.prefetch.{BOPParameters, PrefetchReceiverParams}
+import xs.utils.FileRegisters
+import xs.utils.debug.{HardwareAssertion, HardwareAssertionKey, HwAsrtBundle, HwaParams}
 import xs.utils.perf.{LogUtilsOptions, LogUtilsOptionsKey, PerfCounterOptions, PerfCounterOptionsKey, XSPerfLevel}
 
 class Top(implicit p: Parameters) extends LazyModule {
@@ -71,7 +74,6 @@ class Top(implicit p: Parameters) extends LazyModule {
   }
 
 
-
   lazy val module = new Impl
   class Impl extends LazyModuleImp(this) {
     val l1d = l1dNode.makeIOs()
@@ -88,10 +90,20 @@ class Top(implicit p: Parameters) extends LazyModule {
     l2cache.module.io_nodeID := 0.U
     l2cache.module.io.debugTopDown := DontCare
     l2cache.module.io.l2_tlb_req <> DontCare
+    l2cache.module.assertionOut <> DontCare
     dontTouch(l2cache.module.io)
 
     tpMetaSinkNode.foreach(_.in.head._1.ready := true.B)
     tpMetaSourceNode.foreach(_.out.head._1 := DontCare)
+
+    private val assertionNode = HardwareAssertion.placePipe(Int.MaxValue, moduleTop = true)
+    HardwareAssertion.release(assertionNode, "hwa", "cpl2")
+    assertionNode.assertion.ready := true.B
+    val hwa = Option.when(p(HardwareAssertionKey).enable)(Decoupled(assertionNode.assertion.bits.cloneType))
+    if(p(HardwareAssertionKey).enable) {
+      hwa.get <> assertionNode.assertion
+      dontTouch(hwa.get)
+    }
   }
 }
 
@@ -109,6 +121,7 @@ class TopConfig extends Config((up, here, site) => {
   case MaxHartIdBits => 8
   case LogUtilsOptionsKey => LogUtilsOptions(false, false, true)
   case PerfCounterOptionsKey => PerfCounterOptions(false, false, XSPerfLevel.VERBOSE, 0)
+  case HardwareAssertionKey => HwaParams(enable = true)
 })
 
 object TopMain extends App {
@@ -129,4 +142,5 @@ object TopMain extends App {
 
   private val top = DisableMonitors(p => LazyModule(new Top()(p)))(config)
   (new ChiselStage).execute(firrtlOpts, firtoolOpts :+ ChiselGeneratorAnnotation(() => top.module))
+  FileRegisters.write(fileDir= "./build", filePrefix= "")
 }

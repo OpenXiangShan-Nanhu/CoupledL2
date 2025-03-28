@@ -25,7 +25,7 @@ import freechips.rocketchip.tilelink.TLMessages._
 import coupledL2.prefetch.PrefetchResp
 import xs.utils.perf.{XSPerfAccumulate, XSPerfHistogram, XSPerfMax}
 import xs.utils.tl.MemReqSource
-
+import xs.utils.debug.{DomainInfo, HardwareAssertion}
 // record info of those with Grant sent, yet GrantAck not received
 // used to block Probe upwards
 class InflightGrantEntry(implicit p: Parameters) extends L2Bundle {
@@ -82,6 +82,12 @@ class GrantBuffer(implicit p: Parameters) extends L2Module {
     // to block sourceB from sending same-addr probe until GrantAck received
     val grantStatus = Output(Vec(grantBufInflightSize, new GrantStatus))
   })
+
+  /* ======== HardwareAssertion ======== */
+  val hwaFlags = Array.fill(5)(Wire(Bool()))
+  for (i <- 0 until 5) {
+    hwaFlags(i) := true.B
+  }
 
   // =========== functions ===========
   def toTLBundleD(task: TaskBundle, data: UInt = 0.U, grant_id: UInt = 0.U) = {
@@ -172,7 +178,7 @@ class GrantBuffer(implicit p: Parameters) extends L2Module {
 
   val grantQueueCnt = grantQueue.io.count
   val full = !grantQueue.io.enq.ready
-  assert(!(full && io.d_task.valid), "GrantBuf full and RECEIVE new task, back pressure failed")
+  hwaFlags(0) := !(full && io.d_task.valid)
 
   // =========== dequeue entry and fire ===========
   require(beatSize == 2)
@@ -256,7 +262,7 @@ class GrantBuffer(implicit p: Parameters) extends L2Module {
     resp.bits.pfSource := pftRespQueue.get.io.deq.bits.pfSource
     pftRespQueue.get.io.deq.ready := resp.ready
 
-    assert(pftRespQueue.get.io.enq.ready, "pftRespQueue should never be full, no back pressure logic")
+    hwaFlags(1) := pftRespQueue.get.io.enq.ready
   }
   // If no prefetch, there never should be HintAck
   // assert(prefetchOpt.nonEmpty.B || !io.d_task.valid || dtaskOpcode =/= HintAck)
@@ -271,7 +277,7 @@ class GrantBuffer(implicit p: Parameters) extends L2Module {
     entry.bits.tag    := io.d_task.bits.task.tag
   }
   val inflight_full = Cat(inflightGrant.map(_.valid)).andR
-  assert(!(inflight_full & (io.d_task.fire && (dtaskOpcode === Grant || dtaskOpcode === GrantData || io.d_task.bits.task.mergeA))), "inflightGrant entries overflow")
+  hwaFlags(2) := !(inflight_full & (io.d_task.fire && (dtaskOpcode === Grant || dtaskOpcode === GrantData || io.d_task.bits.task.mergeA)))
 
   // report status to SourceB to block same-addr Probe
   io.grantStatus zip inflightGrant foreach {
@@ -282,7 +288,7 @@ class GrantBuffer(implicit p: Parameters) extends L2Module {
   }
 
   when (io.e.fire) {
-    assert(io.e.bits.sink < grantBufInflightSize.U, "GrantBuf: e.sink overflow inflightGrant size")
+    hwaFlags(3) := io.e.bits.sink < grantBufInflightSize.U
     inflightGrant(io.e.bits.sink).valid := false.B
   }
 
@@ -331,7 +337,7 @@ class GrantBuffer(implicit p: Parameters) extends L2Module {
       case (e, t) =>
         when(e.valid) { t := t + 1.U }
         when(RegNext(e.valid) && !e.valid) { t := 0.U }
-        assert(t < 10000.U, "Inflight Grant Leak")
+        hwaFlags(4) := t < 10000.U
 
         val enable = RegNext(e.valid) && !e.valid
         XSPerfHistogram("grant_grantack_period", t, enable, 0, 12, 1)
@@ -341,4 +347,15 @@ class GrantBuffer(implicit p: Parameters) extends L2Module {
     // which can SERIOUSLY affect performance, should consider less drastic prefetch policy
     XSPerfAccumulate("pftRespQueue_about_to_full", noSpaceForMSHRPft.getOrElse(false.B))
   }
+
+
+  /* ======== HardwareAssertion ======== */
+  HardwareAssertion(hwaFlags(0),cf"GrantBuf full and RECEIVE new task, back pressure failed")
+  HardwareAssertion(hwaFlags(1),cf"pftRespQueue should never be full, no back pressure logic")
+  HardwareAssertion(hwaFlags(2))
+  HardwareAssertion(hwaFlags(3),cf"GrantBuf: e.sink overflow inflightGrant size")
+  HardwareAssertion(hwaFlags(4),cf"Inflight Grant Leak")
+
+  HardwareAssertion.placePipe(Int.MaxValue-2)
+
 }

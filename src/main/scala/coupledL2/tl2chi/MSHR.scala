@@ -32,6 +32,7 @@ import coupledL2.tl2chi.RespErrEncodings._
 import coupledL2.MetaData._
 import coupledL2._
 import xs.utils.tl.MemReqSource
+import xs.utils.debug.HardwareAssertion
 
 class MSHRTasks(implicit p: Parameters) extends TL2CHIL2Bundle {
   // outer
@@ -61,7 +62,9 @@ class MSHR(implicit p: Parameters) extends TL2CHIL2Module with HasCHIOpcodes {
     val aMergeTask = Flipped(ValidIO(new TaskBundle))
     val replResp = Flipped(ValidIO(new ReplacerResult))
     val pCrd = new PCrdQueryBundle
+    val hwaFlags = Output(Vec(15, Bool())) //HardwareAssertion
   })
+
 
   require (chiOpt.isDefined)
 
@@ -85,8 +88,10 @@ class MSHR(implicit p: Parameters) extends TL2CHIL2Module with HasCHIOpcodes {
 
   val req_released_chiOpcode = RegInit(0.U.asTypeOf(UInt(OPCODE_WIDTH.W)))
 
-  assert(!(req_valid && dirResult.hit && !isT(meta.state) && meta.dirty),
-    "directory valid read with dirty under non-T state")
+  // assert(!(req_valid && dirResult.hit && !isT(meta.state) && meta.dirty),
+  //   "directory valid read with dirty under non-T state")
+
+  io.hwaFlags(0) := !(req_valid && dirResult.hit && !isT(meta.state) && meta.dirty)
 
   /**
     * When all the ways are occupied with some mshr, other mshrs with the same set may retry to find a way to replace
@@ -238,10 +243,14 @@ class MSHR(implicit p: Parameters) extends TL2CHIL2Module with HasCHIOpcodes {
   //          the 'retToSrc' of SnpUniqueStash must be bound to 0, and whether responding
   //          SnpRespData or SnpResp was not determined by 'retToSrc'.
   //          the 'retToSrc' of SnpQuery must be bound to 0
-  assert(!(req_valid && req_chiOpcode === SnpUniqueStash && req.retToSrc.get),
-    "specification failure: received SnpUniqueStash with RetToSrc = 1")
-  assert(!(req_valid && isSnpQuery(req_chiOpcode) && req.retToSrc.get),
-    "specification failure: received SnpQuery with RetToSrc = 1")
+  // assert(!(req_valid && req_chiOpcode === SnpUniqueStash && req.retToSrc.get),
+  //   "specification failure: received SnpUniqueStash with RetToSrc = 1")
+  // assert(!(req_valid && isSnpQuery(req_chiOpcode) && req.retToSrc.get),
+  //   "specification failure: received SnpQuery with RetToSrc = 1")
+
+
+  io.hwaFlags(1) := !(req_valid && req_chiOpcode === SnpUniqueStash && req.retToSrc.get)
+  io.hwaFlags(2) := !(req_valid && isSnpQuery(req_chiOpcode) && req.retToSrc.get)
 
   /**
     * About which snoop should echo SnpResp[Data]Fwded instead of SnpResp[Data]:
@@ -257,7 +266,8 @@ class MSHR(implicit p: Parameters) extends TL2CHIL2Module with HasCHIOpcodes {
   // under above circumstances, we grant T to L1 even if it wants B
   val req_promoteT = (req_acquire || req_get || req_prefetch) && (promoteT_normal || promoteT_L3 || promoteT_alias)
 
-  assert(!(req_valid && req_prefetch && dirResult.hit), "MSHR can not receive prefetch hit req")
+  // assert(!(req_valid && req_prefetch && dirResult.hit), "MSHR can not receive prefetch hit req")
+  io.hwaFlags(3) := !(req_valid && req_prefetch && dirResult.hit)
 
   /* ======== Task allocation ======== */
   // The first Release with AllowRetry = 1 is sent to main pipe, because the task needs to write DS.
@@ -294,7 +304,8 @@ class MSHR(implicit p: Parameters) extends TL2CHIL2Module with HasCHIOpcodes {
     mp_cmometaw_valid
   // io.tasks.prefetchTrain.foreach(t => t.valid := !state.s_triggerprefetch.getOrElse(true.B))
 
-  assert(state.s_refill || state.s_cmoresp, "refill not allowed on CMO operation")
+  // assert(state.s_refill || state.s_cmoresp, "refill not allowed on CMO operation")
+  io.hwaFlags(4) := state.s_refill || state.s_cmoresp
 
   when (
     pending_grant_valid &&
@@ -987,9 +998,10 @@ class MSHR(implicit p: Parameters) extends TL2CHIL2Module with HasCHIOpcodes {
     ("NonCopyBackWrData", CHICohStateTransSet.ofNonCopyBackWrData(NonCopyBackWrData)),
     ("WriteDataCancel", CHICohStateTransSet.ofWriteDataCancel(WriteDataCancel))
   ).foreach { case (name, set) => {
-    assert(!mp_valid || CHICohStateTransSet.isValid(set, 
-        mp.txChannel, mp.chiOpcode.get, mp.resp.get),
-      s"invalid Resp for ${name}")
+    // assert(!mp_valid || CHICohStateTransSet.isValid(set, 
+    //     mp.txChannel, mp.chiOpcode.get, mp.resp.get),
+    //   s"invalid Resp for ${name}")
+    io.hwaFlags(5) := !mp_valid || CHICohStateTransSet.isValid(set, mp.txChannel, mp.chiOpcode.get, mp.resp.get)
   }}
 
   ifAfterIssueC {
@@ -997,9 +1009,10 @@ class MSHR(implicit p: Parameters) extends TL2CHIL2Module with HasCHIOpcodes {
       ("DataSepResp", CHICohStateTransSet.ofDataSepResp(DataSepResp)),
       ("RespSepData", CHICohStateTransSet.ofRespSepData(RespSepData))
     ).foreach { case (name, set) => {
-      assert(!mp_valid || CHICohStateTransSet.isValid(set, 
-          mp.txChannel, mp.chiOpcode.get, mp.resp.get),
-        s"invalid Resp for ${name}")
+      // assert(!mp_valid || CHICohStateTransSet.isValid(set, 
+      //     mp.txChannel, mp.chiOpcode.get, mp.resp.get),
+      //   s"invalid Resp for ${name}")
+       io.hwaFlags(6) := !mp_valid || CHICohStateTransSet.isValid(set, mp.txChannel, mp.chiOpcode.get, mp.resp.get)
     }}
   }
 
@@ -1008,9 +1021,10 @@ class MSHR(implicit p: Parameters) extends TL2CHIL2Module with HasCHIOpcodes {
     ("SnpRespFwded", CHICohStateFwdedTransSet.ofSnpRespFwded(SnpRespFwded)),
     ("SnpRespDataFwded", CHICohStateFwdedTransSet.ofSnpRespDataFwded(SnpRespDataFwded))
   ).foreach { case (name, set) => {
-    assert(!mp_valid || CHICohStateFwdedTransSet.isValid(set, 
-        mp.txChannel, mp.chiOpcode.get, mp.resp.get, mp.fwdState.get),
-      s"invalid combination of Resp and FwdState for ${name}")
+    // assert(!mp_valid || CHICohStateFwdedTransSet.isValid(set, 
+    //     mp.txChannel, mp.chiOpcode.get, mp.resp.get, mp.fwdState.get),
+    //   s"invalid combination of Resp and FwdState for ${name}")
+    io.hwaFlags(7) := !mp_valid || CHICohStateFwdedTransSet.isValid(set, mp.txChannel, mp.chiOpcode.get, mp.resp.get, mp.fwdState.get)
   }}
 
   /* ======== Task update ======== */
@@ -1030,8 +1044,9 @@ class MSHR(implicit p: Parameters) extends TL2CHIL2Module with HasCHIOpcodes {
     when (wcompack_valid) {
       state.s_wcompack.get := true.B
     }
-    assert(!(rcompack_valid && wcompack_valid))
+    // assert(!(rcompack_valid && wcompack_valid))
   }
+  io.hwaFlags(8) := Mux(io.tasks.txrsp.fire, !(rcompack_valid && wcompack_valid), true.B)
   when (io.tasks.source_b.fire) {
     state.s_pprobe := true.B
     state.s_rprobe := true.B
@@ -1336,8 +1351,10 @@ class MSHR(implicit p: Parameters) extends TL2CHIL2Module with HasCHIOpcodes {
   io.msInfo.bits.releaseToClean := releaseToClean
   io.msInfo.bits.channel := req.channel
 
-  assert(!(c_resp.valid && !io.status.bits.w_c_resp))
-  assert(!(rxrsp.valid && rxrsp.bits.chiOpcode.get =/= PCrdGrant && !io.status.bits.w_d_resp))
+  // assert(!(c_resp.valid && !io.status.bits.w_c_resp))
+  // assert(!(rxrsp.valid && rxrsp.bits.chiOpcode.get =/= PCrdGrant && !io.status.bits.w_d_resp))
+  io.hwaFlags(9) := !(c_resp.valid && !io.status.bits.w_c_resp)
+  io.hwaFlags(10):= !(rxrsp.valid && rxrsp.bits.chiOpcode.get =/= PCrdGrant && !io.status.bits.w_d_resp)
 
   /* ======== Handling Nested C ======== */
   // for A miss, only when replResp do we finally choose a way, allowing nested C
@@ -1416,10 +1433,10 @@ class MSHR(implicit p: Parameters) extends TL2CHIL2Module with HasCHIOpcodes {
     io.tasks.mainpipe.fire && io.tasks.mainpipe.bits.opcode === WriteCleanFull && io.tasks.mainpipe.bits.toTXREQ
   val weFire = io.tasks.txreq.fire && io.tasks.txreq.bits.opcode === WriteEvictFull ||
     io.tasks.mainpipe.fire && io.tasks.mainpipe.bits.opcode === WriteEvictFull && io.tasks.mainpipe.bits.toTXREQ
-  assert(!RegNext(evictFire) || state.s_cbwrdata.get, "There should be no CopyBackWrData after Evict")
-  assert(!RegNext(wbFire) || !state.s_cbwrdata.get, "There must be a CopyBackWrData after WriteBack")
-  assert(!RegNext(wcFire) || !state.s_cbwrdata.get, "There must be a CopyBackWrData after WriteClean")
-  assert(!RegNext(weFire) || !state.s_cbwrdata.get, "There must be a CopyBackWrData after WriteEvictFull")
+  io.hwaFlags(11) := !RegNext(evictFire) || state.s_cbwrdata.get
+  io.hwaFlags(12) := !RegNext(wbFire) || !state.s_cbwrdata.get
+  io.hwaFlags(13) := !RegNext(wcFire) || !state.s_cbwrdata.get
+  io.hwaFlags(14) := !RegNext(weFire) || !state.s_cbwrdata.get
 
   /* ======== Performance counters ======== */
   // time stamp

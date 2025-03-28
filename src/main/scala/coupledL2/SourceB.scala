@@ -25,7 +25,7 @@ import freechips.rocketchip.tilelink._
 import org.chipsalliance.cde.config.Parameters
 import xs.utils._
 import xs.utils.perf.{XSPerfAccumulate, XSPerfHistogram}
-
+import xs.utils.debug.{DomainInfo, HardwareAssertion}
 
 class GrantStatus(implicit p: Parameters) extends L2Bundle {
   val valid  = Bool()
@@ -65,6 +65,11 @@ class SourceB(implicit p: Parameters) extends L2Module {
     b.corrupt := false.B
     b
   }
+  /* ======== HardwareAssertion ======== */
+  val hwaFlags = Array.fill(1)(Wire(Bool()))
+  for (i <- 0 until 1) {
+    hwaFlags(i) := true.B
+  }
 
   /* ======== Data Structure ======== */
   // TODO: check XSPerf whether 4 entries is enough
@@ -96,7 +101,7 @@ class SourceB(implicit p: Parameters) extends L2Module {
     p.rdy   := !conflict
     p.waitG := OHToUInt(conflictMask)
     p.task  := io.task.bits
-    assert(PopCount(conflictMask) <= 1.U)
+    hwaFlags(0):=(PopCount(conflictMask) <= 1.U)
   }
 
   /* ======== Issue ======== */
@@ -128,4 +133,10 @@ class SourceB(implicit p: Parameters) extends L2Module {
     val update = PopCount(probes.map(_.valid)) === i.U
     XSPerfAccumulate(s"probe_buffer_util_$i", update)
   }
+
+
+  /* ======== HardwareAssertion ======== */
+  HardwareAssertion(hwaFlags(0))
+
+  HardwareAssertion.placePipe(Int.MaxValue-3)
 }

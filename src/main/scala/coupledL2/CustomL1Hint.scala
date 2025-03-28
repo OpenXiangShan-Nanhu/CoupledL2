@@ -23,6 +23,7 @@ import xs.utils._
 import org.chipsalliance.cde.config.Parameters
 import freechips.rocketchip.tilelink.TLMessages._
 import coupledL2.utils._
+import xs.utils.debug.{DomainInfo, HardwareAssertion}
 
 class HintQueueEntry(implicit p: Parameters) extends L2Bundle {
   val source = UInt(sourceIdBits.W)
@@ -46,6 +47,12 @@ class CustomL1HintIOBundle(implicit p: Parameters) extends L2Bundle {
 // use this interface to give a hint to l1 before actually sending a GrantData
 class CustomL1Hint(implicit p: Parameters) extends L2Module {
   val io = IO(new CustomL1HintIOBundle)
+
+  /* ======== HardwareAssertion ======== */
+  val hwaFlags = Array.fill(2)(Wire(Bool()))
+  for (i <- 0 until 2) {
+    hwaFlags(i) := true.B
+  }
 
   val task_s1 = io.s1
   val task_s3 = io.s3.task
@@ -107,8 +114,8 @@ class CustomL1Hint(implicit p: Parameters) extends L2Module {
   hint_s1Queue.io.enq.bits.isKeyword := enqKeyWord_s1
   hint_s1Queue.io.deq.ready := hintQueue.io.enq.ready && !enqValid_s3
   // WARNING:TODO: ensure queue will never overflow
-  assert(hint_s1Queue.io.enq.ready, "hint_s1Queue should never be full")
-  assert(hintQueue.io.enq.ready, "hintQueue should never be full")
+  hwaFlags(0) := hint_s1Queue.io.enq.ready
+  hwaFlags(1) := hintQueue.io.enq.ready
 
   hintQueue.io.enq.valid := enqValid_s3 || hint_s1Queue.io.deq.valid
   hintQueue.io.enq.bits.opcode := Mux(enqValid_s3, enqOpcode_s3, hint_s1Queue.io.deq.bits.opcode)
@@ -119,4 +126,12 @@ class CustomL1Hint(implicit p: Parameters) extends L2Module {
   io.l1Hint.valid := hintQueue.io.deq.valid && hintQueue.io.deq.bits.opcode === GrantData
   io.l1Hint.bits.sourceId := hintQueue.io.deq.bits.source
   io.l1Hint.bits.isKeyword := hintQueue.io.deq.bits.isKeyword
+
+
+  /* ======== HardwareAssertion ======== */
+  HardwareAssertion(hwaFlags(0), cf"hint_s1Queue should never be full")
+  HardwareAssertion(hwaFlags(1), cf"hintQueue should never be full")
+
+
+  HardwareAssertion.placePipe(Int.MaxValue-2)
 }

@@ -6,6 +6,7 @@ import org.chipsalliance.cde.config.Parameters
 import coupledL2._
 import coupledL2.MetaData._
 import xs.utils.ChiselDB
+import xs.utils.debug.HardwareAssertion
 
 class MainpipeMoni(implicit p: Parameters) extends L2Bundle {
   val task_s2 = ValidIO(new TaskBundle())
@@ -41,6 +42,12 @@ class Monitor(implicit p: Parameters) extends L2Module {
 //  val nestedWBValid = Input(Bool())
   })
 
+  /* ======== HardwareAssertion ======== */
+  val hwaFlags = Array.fill(2)(Wire(Bool()))
+  for (i <- 0 until 2) {
+    hwaFlags(i) := true.B
+  }
+
   val mp            = io.fromMainPipe
   val s2_valid      = mp.task_s2.valid
   val req_s2        = mp.task_s2.bits
@@ -59,13 +66,8 @@ class Monitor(implicit p: Parameters) extends L2Module {
 //    "C Release should always hit or have some MSHR meta nested, Tag %x Set %x",
 //    req_s3.tag, req_s3.set)
 
-  assert(RegNext(!(s3_valid && !mshr_req_s3 && dirResult_s3.hit &&
-    meta_s3.state === TRUNK && !meta_s3.clients.orR)),
-    "Trunk should have some client hit")
-
-  assert(RegNext(!(s3_valid && req_s3.fromC && dirResult_s3.hit &&
-    !meta_s3.clients.orR)),
-    "Invalid Client should not send Release")
+  hwaFlags(0) := RegNext(!(s3_valid && !mshr_req_s3 && dirResult_s3.hit && meta_s3.state === TRUNK && !meta_s3.clients.orR))
+  hwaFlags(1) := RegNext(!(s3_valid && req_s3.fromC && dirResult_s3.hit && !meta_s3.clients.orR))
 
   // assertion for set blocking
   // A channel task @s1 never have same-set task @s2/s3
@@ -101,4 +103,11 @@ class Monitor(implicit p: Parameters) extends L2Module {
 
     table.log(s3Info, s3_valid, s"L2${hartId}_${p(SliceIdKey)}", clock, reset)
   }
+
+
+  /* ======== HardwareAssertion ======== */
+  HardwareAssertion(hwaFlags(0), cf"Trunk should have some client hit")
+  HardwareAssertion(hwaFlags(1), cf"Invalid Client should not send Release")
+
+  HardwareAssertion.placePipe(Int.MaxValue-1)
 }
