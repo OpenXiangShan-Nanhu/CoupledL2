@@ -21,7 +21,7 @@ import chisel3._
 import chisel3.util._
 import freechips.rocketchip.diplomacy.AddressSet
 import org.chipsalliance.cde.config.Field
-import utility.ParallelPriorityMux
+import xs.utils.ParallelPriorityMux
 
 /**
   * System Address Map

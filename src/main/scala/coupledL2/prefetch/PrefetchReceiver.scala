@@ -19,10 +19,7 @@ package coupledL2.prefetch
 
 import org.chipsalliance.cde.config.Parameters
 import chisel3._
-import chisel3.util._
-import freechips.rocketchip.tilelink._
-import coupledL2._
-import utility.{Constantin, RegNextN}
+import xs.utils.{Constantin, RegNextN}
 
 // TODO: PrefetchReceiver is temporarily used since L1&L2 do not support Hint.
 // TODO: Delete this after Hint is accomplished.

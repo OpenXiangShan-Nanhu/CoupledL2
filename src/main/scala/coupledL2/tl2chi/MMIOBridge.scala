@@ -20,13 +20,14 @@ package coupledL2.tl2chi
 
 import chisel3._
 import chisel3.util._
-import utility._
 import org.chipsalliance.cde.config.Parameters
 import freechips.rocketchip.diplomacy._
 import freechips.rocketchip.tilelink._
 import freechips.rocketchip.tilelink.TLMessages._
 import coupledL2.HasCoupledL2Parameters
 import coupledL2.{MemBackTypeMM, MemPageTypeNC}
+import xs.utils.{ParallelLookUp, ParallelPriorityMux, RRArbiterInit, SECDEDCode, ZeroExt}
+import xs.utils.perf.XSPerfAccumulate
 
 class MMIOBridge()(implicit p: Parameters) extends LazyModule
   with HasCoupledL2Parameters

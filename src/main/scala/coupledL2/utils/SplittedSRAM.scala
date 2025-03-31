@@ -2,7 +2,7 @@ package coupledL2.utils
 
 import chisel3._
 import chisel3.util._
-import utility.sram.SramHelper
+import xs.utils.sram.{SRAMReadBus, SRAMWriteBus, SramHelper}
 
 // split SRAM by set/way/data
 // 1. use lower-bits of set to select bank
@@ -16,10 +16,9 @@ class SplittedSRAM[T <: Data]
   setSplit: Int = 1, waySplit: Int = 1, dataSplit: Int = 1,
   shouldReset: Boolean = false, holdRead: Boolean = false,
   singlePort: Boolean = true, bypassWrite: Boolean = false,
-  clkDivBy2: Boolean = false, readMCP2: Boolean = true,
-  clockGated: Boolean = false, hasMbist:Boolean = false,
-  hasSramCtl: Boolean = false, extraHold: Boolean = false,
-  extClockGate:Boolean = false, suffix: Option[String] = None
+  clkDivBy2: Boolean = false, readMCP2: Boolean = false,
+  hasMbist:Boolean = false, extraHold: Boolean = false,
+  suffix: Option[String] = None
 )(implicit valName: sourcecode.FullName) extends Module {
   val io = IO(new Bundle() {
     val r = Flipped(new SRAMReadBus(gen, set, way))
@@ -43,14 +42,13 @@ class SplittedSRAM[T <: Data]
   val innerWidth = gen.getWidth / dataSplit
 
   val array = Seq.fill(setSplit)(Seq.fill(waySplit)(Seq.fill(dataSplit)(
-    Module(new utility.sram.SRAMTemplate(
+    Module(new xs.utils.sram.SRAMTemplate(
       UInt(innerWidth.W), innerSets, innerWays,
       shouldReset = shouldReset, holdRead = holdRead,
       singlePort = singlePort, bypassWrite = bypassWrite,
-      hasMbist = hasMbist, hasSramCtl = hasSramCtl,
-      latency = if(readMCP2) 2 else 1, extraHold = extraHold,
-      withClockGate = clockGated, extClockGate = extClockGate,
-      suffix = Some(suffix.getOrElse(SramHelper.getSramSuffix(valName.value)))
+      hasMbist = hasMbist, latency = if(readMCP2) 2 else 1,
+      extraHold = extraHold,
+      suffix = suffix.getOrElse("")
     ))
   )))
 
@@ -117,6 +115,7 @@ class SplittedSRAM[T <: Data]
       )
     ))
   )
-
+  val valids = array.flatMap(_.flatMap(_.map(_.io.r.resp.valid)))
+  io.r.resp.valid := Cat(valids).orR
   io.r.resp.data := Mux1H(ren_vec, allData).asTypeOf(Vec(way, gen))
 }

@@ -23,9 +23,9 @@ import freechips.rocketchip.diplomacy.{BufferParams, AddressSet}
 import freechips.rocketchip.tilelink._
 import freechips.rocketchip.util._
 import org.chipsalliance.cde.config.Field
-import huancun.{AliasKey, CacheParameters, IsHitKey, PrefetchKey}
 import coupledL2.prefetch._
-import utility.{MemReqSource, ReqSourceKey, Code}
+import xs.utils.common.{AliasKey, IsHitKey, PrefetchKey}
+import xs.utils.tl.ReqSourceKey
 
 case object EnableCHI extends Field[Boolean](false)
 
@@ -99,6 +99,7 @@ case class L2Param(
   hartId: Int = 0,
   // Prefetch
   prefetch: Seq[PrefetchParameters] = Nil,
+  blockCircle: Int = 200,
   // L2 Flush
   enableL2Flush: Boolean = false,
   // Performance analysis
@@ -126,23 +127,11 @@ case class L2Param(
 
   // Network layer SAM
   sam: Seq[(AddressSet, Int)] = Seq(AddressSet.everything -> 0),
-
-  // Enable sram test support
-  hasMbist: Boolean = false,
-  hasSramCtl: Boolean = false,
+  hasMbist:Boolean = false
 ) {
-  def toCacheParams: CacheParameters = CacheParameters(
-    name = name,
-    sets = sets,
-    ways = ways,
-    blockGranularity = log2Ceil(sets),
-    blockBytes = blockBytes
-  )
-
+  lazy val capacity = sets * ways * blockBytes
   def tagCode: Code = Code.fromString(tagECC)
   def dataCode: Code = Code.fromString(dataECC)
-
-  def hasSramTest: Boolean = hasMbist || hasSramCtl
 }
 
 case object L2ParamKey extends Field[L2Param](L2Param())

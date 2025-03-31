@@ -21,7 +21,7 @@ import chisel3._
 import chisel3.util._
 import org.chipsalliance.cde.config.Parameters
 import freechips.rocketchip.tilelink.TLPermissions._
-import utility.MemReqSource
+import xs.utils.tl.MemReqSource
 import coupledL2.{HasTLChannelBits, DirResult, PipeStatus}
 
 object CHIChannel {

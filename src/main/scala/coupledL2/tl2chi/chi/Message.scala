@@ -497,7 +497,7 @@ class CHIDAT(implicit p: Parameters) extends CHIBundle {
     dataSource := s
   }
 
-  val cBusy = Eb_FIELD(UInt(CBUSY_WIDTH.W))
+  val cBusy = UInt(CBUSY_WIDTH.W)
 
   val dbID = UInt(DBID_WIDTH.W)
   val ccID = UInt(CCID_WIDTH.W)
@@ -537,7 +537,7 @@ class CHIRSP(implicit p: Parameters) extends CHIBundle {
   val fwdState = UInt(FWDSTATE_WIDTH.W)
   def dataPull = fwdState
 
-  val cBusy = Eb_FIELD(UInt(CBUSY_WIDTH.W))
+  val cBusy = UInt(CBUSY_WIDTH.W)
 
   val dbID = UInt(DBID_WIDTH.W)
   def pGroupID = Eb_FIELD(dbID(LPID_WITH_PADDING_WIDTH - 1, 0))

@@ -19,9 +19,10 @@ package coupledL2.tl2chi
 
 import chisel3._
 import chisel3.util._
-import utility._
 import org.chipsalliance.cde.config.Parameters
-import coupledL2.{RespBundle, MSHRBufWrite}
+import coupledL2.{MSHRBufWrite, RespBundle}
+import xs.utils.SECDEDCode
+import xs.utils.debug.HardwareAssertion
 
 class RXDAT(implicit p: Parameters) extends TL2CHIL2Module {
   val io = IO(new Bundle() {
@@ -83,6 +84,7 @@ class RXDAT(implicit p: Parameters) extends TL2CHIL2Module {
   io.in.respInfo.denied           := io.out.bits.respErr === RespErrEncodings.NDERR
   io.in.respInfo.corrupt          := io.out.bits.respErr === RespErrEncodings.DERR || io.out.bits.respErr === RespErrEncodings.NDERR || dataCheck || poison
   io.in.respInfo.dataCheckErr.get := dataCheck
+  io.in.respInfo.cBusy.get        := io.out.bits.cBusy
 
   io.out.ready := true.B
 

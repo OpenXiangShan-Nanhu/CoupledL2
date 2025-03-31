@@ -22,10 +22,8 @@ import freechips.rocketchip.tilelink.TLMessages._
 import freechips.rocketchip.tilelink.TLPermissions._
 import chisel3._
 import chisel3.util._
-import coupledL2._
-import coupledL2.utils._
-import utility._
-
+import xs.utils.FastArbiter
+import xs.utils.perf.{XSPerfAccumulate, XSPerfHistogram, XSPerfMax}
 class ReqEntry(entries: Int = 4)(implicit p: Parameters) extends L2Bundle() {
   val valid    = Bool()
   val rdy      = Bool()

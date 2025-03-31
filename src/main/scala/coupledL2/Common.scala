@@ -21,8 +21,8 @@ import chisel3._
 import chisel3.util._
 import org.chipsalliance.cde.config.Parameters
 import freechips.rocketchip.tilelink.TLPermissions._
-import utility.MemReqSource
-import tl2chi.{HasCHIMsgParameters, HasCHIChannelBits, CHIREQ, MemAttr, OrderEncodings}
+import tl2chi.{CHIREQ, HasCHIChannelBits, HasCHIMsgParameters, MemAttr, OrderEncodings}
+import xs.utils.tl.MemReqSource
 
 abstract class L2Module(implicit val p: Parameters) extends Module with HasCoupledL2Parameters
 abstract class L2Bundle(implicit val p: Parameters) extends Bundle with HasCoupledL2Parameters
@@ -252,6 +252,7 @@ class RespInfoBundle(implicit p: Parameters) extends L2Bundle
   val respErr = chiOpt.map(_ => UInt(RESPERR_WIDTH.W))
   val traceTag = chiOpt.map(_ => Bool())
   val dataCheckErr = chiOpt.map(_ => Bool())
+  val cBusy = chiOpt.map(_ => UInt(CBUSY_WIDTH.W))
 }
 
 class RespBundle(implicit p: Parameters) extends L2Bundle {
@@ -344,13 +345,6 @@ class PrefetchCtrlFromCore extends Bundle {
   val l2_pbop_en = Bool()
   val l2_vbop_en = Bool()
   val l2_tp_en = Bool()
-}
-
-class PrefetchRecv extends Bundle {
-  val addr = UInt(64.W)
-  val pf_source = UInt(MemReqSource.reqSourceBits.W)
-  val addr_valid = Bool()
-  val l2_pf_en = Bool()
 }
 
 // custom l2 - l1 interface

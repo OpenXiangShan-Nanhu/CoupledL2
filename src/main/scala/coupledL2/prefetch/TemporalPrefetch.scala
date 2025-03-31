@@ -31,10 +31,12 @@ package coupledL2.prefetch
 import chisel3._
 import chisel3.util._
 import org.chipsalliance.cde.config.Parameters
-import utility.{ChiselDB, Constantin, MemReqSource, SRAMTemplate}
+import xs.utils.{ChiselDB, Constantin}
 import coupledL2.HasCoupledL2Parameters
 import coupledL2.utils.ReplacementPolicy
-import huancun.{TPmetaReq, TPmetaResp}
+import xs.utils.common.{TPmetaReq, TPmetaResp}
+import xs.utils.sram.SRAMTemplate
+import xs.utils.tl.MemReqSource
 
 case class TPParameters(
     tpTableEntries: Int = 16384,
@@ -139,15 +141,7 @@ class TemporalPrefetch(implicit p: Parameters) extends TPModule {
   }
 
   val tpMetaTable = Module(
-    new SRAMTemplate(
-      new tpMetaEntry(),
-      set = tpTableNrSet,
-      way = tpTableAssoc,
-      shouldReset = false,
-      singlePort = true,
-      hasMbist = cacheParams.hasMbist,
-      hasSramCtl = cacheParams.hasSramCtl
-    )
+    new SRAMTemplate(new tpMetaEntry(), set = tpTableNrSet, way = tpTableAssoc, shouldReset = false, singlePort = true, hasMbist = cacheParams.hasMbist)
   )
   val dataReadQueue = Module(new Queue(new TPmetaReq(hartIdLen, fullAddressBits, offsetBits), dataReadQueueDepth, pipe = false, flow = false))
   val dataWriteQueue = Module(new Queue(new TPmetaReq(hartIdLen, fullAddressBits, offsetBits), dataWriteQueueDepth, pipe = false, flow = false))

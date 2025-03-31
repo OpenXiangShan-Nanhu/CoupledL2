@@ -19,11 +19,12 @@ package coupledL2.tl2tl
 
 import chisel3._
 import chisel3.util._
-import utility._
 import org.chipsalliance.cde.config.Parameters
 import freechips.rocketchip.tilelink._
 import coupledL2._
-import huancun.DirtyKey
+import xs.utils.ParallelPriorityMux
+import xs.utils.common.DirtyKey
+import xs.utils.tl.ReqSourceKey
 
 //class SourceC(implicit p: Parameters) extends L2Module {
 //  val io = IO(new Bundle() {
@@ -190,7 +191,7 @@ class SourceC(implicit p: Parameters) extends L2Module {
     c.address := Cat(task.tag, task.set, task.off)
     c.data := data
     c.corrupt := false.B
-    c.user.lift(utility.ReqSourceKey).foreach(_ := task.reqSource)
+    c.user.lift(ReqSourceKey).foreach(_ := task.reqSource)
     c.echo.lift(DirtyKey).foreach(_ := task.dirty)
     c
   }

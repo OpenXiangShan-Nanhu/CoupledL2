@@ -23,7 +23,8 @@ import chisel3.util._
 import coupledL2.utils._
 import freechips.rocketchip.tilelink._
 import org.chipsalliance.cde.config.Parameters
-import utility._
+import xs.utils._
+import xs.utils.perf.{XSPerfAccumulate, XSPerfHistogram}
 
 class GrantStatus(implicit p: Parameters) extends L2Bundle {
   val valid  = Bool()

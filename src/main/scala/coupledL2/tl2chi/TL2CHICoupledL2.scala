@@ -19,16 +19,11 @@ package coupledL2.tl2chi
 
 import chisel3._
 import chisel3.util._
-import utility.{FastArbiter, Pipeline, ParallelPriorityMux, RegNextN, RRArbiterInit, XSPerfAccumulate}
+import coupledL2._
 import freechips.rocketchip.diplomacy._
 import freechips.rocketchip.tilelink._
-import freechips.rocketchip.tilelink.TLMessages._
-import freechips.rocketchip.util._
-import org.chipsalliance.cde.config.{Parameters, Field}
-import scala.math.max
-import coupledL2._
-import coupledL2.prefetch._
-
+import org.chipsalliance.cde.config.Parameters
+import xs.utils.RRArbiterInit
 abstract class TL2CHIL2Bundle(implicit val p: Parameters) extends Bundle
   with HasCoupledL2Parameters
   with HasCHIMsgParameters
@@ -68,21 +63,12 @@ class TL2CHICoupledL2(implicit p: Parameters) extends CoupledL2Base {
   class CoupledL2Imp(wrapper: LazyModule) extends BaseCoupledL2Imp(wrapper)
     with HasCHIOpcodes {
 
-    val io_chi = IO(new PortIO)
+    val io_chi = IO(new DecoupledPortIO)
     val io_nodeID = IO(Input(UInt()))
     val io_cpu_halt = Option.when(cacheParams.enableL2Flush) (Input(Bool()))
+    // prefetchreq blocker
+    val prefBlocker = Module(new PrefetchReqBlocker()(pftParams))
 
-    // Check port width
-    require(io_chi.tx.rsp.getWidth == io_chi.rx.rsp.getWidth);
-    require(io_chi.tx.dat.getWidth == io_chi.rx.dat.getWidth);
-
-    // Display info
-    println(s"CHI Issue Version: ${p(CHIIssue)}")
-    println(s"CHI REQ Flit Width: ${io_chi.tx.req.flit.getWidth}")
-    println(s"CHI RSP Flit Width: ${io_chi.tx.rsp.flit.getWidth}")
-    println(s"CHI SNP Flit Width: ${io_chi.rx.snp.flit.getWidth}")
-    println(s"CHI DAT Flit Width: ${io_chi.rx.dat.flit.getWidth}")
-    println(s"CHI Port Width: ${io_chi.getWidth}")
 
     println(s"MMIO:")
     mmioNode.edges.in.headOption.foreach { n =>
@@ -247,24 +233,30 @@ class TL2CHICoupledL2(implicit p: Parameters) extends CoupledL2Base {
           Cat(slices.zipWithIndex.map { case (s, i) => s.io.out.rx.dat.ready && rxdatSliceID === i.U}).orR
         )
 
-        val linkMonitor = Module(new LinkMonitor)
-        linkMonitor.io.in.tx.req <> txreq
-        linkMonitor.io.in.tx.rsp <> txrsp
-        linkMonitor.io.in.tx.dat <> txdat
-        rxsnp <> linkMonitor.io.in.rx.snp
-        rxrsp <> linkMonitor.io.in.rx.rsp
-        rxdat <> linkMonitor.io.in.rx.dat
-        io_chi <> linkMonitor.io.out
-        linkMonitor.io.nodeID := io_nodeID
-        /* exit coherency when: l2 flush of all slices is done and core is in WFI state */
-        linkMonitor.io.exitco.foreach { _ :=
-          Cat(slices.zipWithIndex.map { case (s, i) => s.io.l2FlushDone.getOrElse(false.B)}).andR && io_cpu_halt.getOrElse(false.B)
-        }
+        io_chi.tx.req <> txreq
+        io_chi.tx.rsp <> txrsp
+        io_chi.tx.dat <> txdat
+        rxsnp <> io_chi.rx.snp
+        rxrsp <> io_chi.rx.rsp
+        rxdat <> io_chi.rx.dat
+    }
+    // reqblocker->slice
+    slices.zipWithIndex.foreach{
+      case(s,i)=>
+        //Prefetcher->reqblocker
+        prefBlocker.io.reqFromPref := prefetcher.get.io.req.bits
+        val loadStateRxRsp  = io_chi.rx.rsp.bits.cBusy(1, 0)
+        val loadStateRxDat  = io_chi.rx.dat.bits.cBusy(1, 0)
+        val isBusyFromRxRsp = io_chi.rx.rsp.fire & ((loadStateRxRsp === LdState.High) || (loadStateRxRsp === LdState.Critical))
+        val isBusyFromRxDat = io_chi.rx.dat.fire & ((loadStateRxDat === LdState.High) || (loadStateRxDat === LdState.Critical))
+        val isBusy = isBusyFromRxRsp || isBusyFromRxDat
+        prefBlocker.io.shouldBlock := isBusy
+        s.io.prefetch.get.req.bits:= prefBlocker.io.reqToSlice
 
-        /**
-          * performance counters
-          */
-        XSPerfAccumulate("pcrd_count", pCrdQueue.io.enq.fire)
+        def bank_eq(set: UInt, bankId: Int, bankBits: Int): Bool = {
+          if(bankBits == 0) true.B else set(bankBits - 1, 0) === bankId.U
+        }
+        s.io.prefetch.get.req.valid := Mux(prefBlocker.io.alreadyBlock, false.B, prefetcher.get.io.req.valid && bank_eq(Cat(prefetcher.get.io.req.bits.tag, prefetcher.get.io.req.bits.set), i, bankBits))
     }
   }
 

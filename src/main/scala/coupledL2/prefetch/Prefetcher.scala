@@ -19,10 +19,12 @@ package coupledL2.prefetch
 
 import chisel3._
 import chisel3.util._
-import utility._
 import org.chipsalliance.cde.config.Parameters
-import utility.mbist.MbistPipeline
+import xs.utils.mbist.MbistPipeline
 import coupledL2._
+import xs.utils.{ChiselDB, HasCircularQueuePtrHelper, ParallelPriorityMux, Pipeline, RegNextN, ValidIODelay}
+import xs.utils.perf.{XSPerfAccumulate, XSPerfHistogram}
+import xs.utils.tl.MemReqSource
 
 /* virtual address */
 trait HasPrefetcherHelper extends HasCircularQueuePtrHelper with HasCoupledL2Parameters {

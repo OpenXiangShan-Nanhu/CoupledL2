@@ -19,7 +19,6 @@ package coupledL2.tl2chi
 
 import chisel3._
 import chisel3.util._
-import utility._
 import org.chipsalliance.cde.config.Parameters
 import coupledL2.RespBundle
 
@@ -50,6 +49,7 @@ class RXRSP(implicit p: Parameters) extends TL2CHIL2Module {
   io.in.respInfo.respErr.get   := io.out.bits.respErr
   io.in.respInfo.last          := true.B
   io.in.respInfo.traceTag.get  := io.out.bits.traceTag
+  io.in.respInfo.cBusy.get     := io.out.bits.cBusy
 
   io.out.ready := true.B
 
