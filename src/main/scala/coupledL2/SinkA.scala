@@ -27,6 +27,7 @@ import coupledL2.prefetch.PrefetchReq
 import xs.utils.common.{AliasKey, PrefetchKey}
 import xs.utils.tl.{MemReqSource, ReqSourceKey}
 import xs.utils.perf.XSPerfAccumulate
+import xs.utils.debug.HAssert
 
 class SinkA(implicit p: Parameters) extends L2Module {
   val io = IO(new Bundle() {
@@ -35,7 +36,7 @@ class SinkA(implicit p: Parameters) extends L2Module {
     val task = DecoupledIO(new TaskBundle)
     val cmoAll = Option.when(cacheParams.enableL2Flush) (new IOCMOAll)
   })
-  assert(!(io.a.valid && (io.a.bits.opcode === PutFullData ||
+  HAssert(!(io.a.valid && (io.a.bits.opcode === PutFullData ||
                           io.a.bits.opcode === PutPartialData)),
     "no Put");
 
@@ -213,4 +214,5 @@ class SinkA(implicit p: Parameters) extends L2Module {
   XSPerfAccumulate("sinkA_put_stall_by_mainpipe", stall &&
     (io.task.bits.opcode === PutFullData || io.task.bits.opcode === PutPartialData))
   prefetchOpt.foreach { _ => XSPerfAccumulate("sinkA_prefetch_stall_by_mainpipe", stall && io.task.bits.opcode === Hint) }
+  HAssert.placePipe(2)
 }

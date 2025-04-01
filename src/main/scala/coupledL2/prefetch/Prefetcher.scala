@@ -25,6 +25,7 @@ import coupledL2._
 import xs.utils.{ChiselDB, HasCircularQueuePtrHelper, ParallelPriorityMux, Pipeline, RegNextN, ValidIODelay}
 import xs.utils.perf.{XSPerfAccumulate, XSPerfHistogram}
 import xs.utils.tl.MemReqSource
+import xs.utils.debug.HAssert
 
 /* virtual address */
 trait HasPrefetcherHelper extends HasCircularQueuePtrHelper with HasCoupledL2Parameters {
@@ -324,7 +325,7 @@ class Prefetcher(implicit p: Parameters) extends PrefetchModule {
     pfRcv.get.io.tlb_req.resp.valid := false.B
     pfRcv.get.io.tlb_req.resp.bits := DontCare
     pfRcv.get.io.tlb_req.pmp_resp := DontCare
-    assert(!pfRcv.get.io.req.valid ||
+    HAssert(!pfRcv.get.io.req.valid ||
       pfRcv.get.io.req.bits.pfSource === MemReqSource.Prefetch2L2SMS.id.U ||
       pfRcv.get.io.req.bits.pfSource === MemReqSource.Prefetch2L2Stream.id.U ||
       pfRcv.get.io.req.bits.pfSource === MemReqSource.Prefetch2L2Stride.id.U
@@ -426,4 +427,5 @@ class Prefetcher(implicit p: Parameters) extends PrefetchModule {
     site = "L2Prefetch_onlyBOP",
     clock, reset
   )
+  HAssert.placePipe(3)
 }

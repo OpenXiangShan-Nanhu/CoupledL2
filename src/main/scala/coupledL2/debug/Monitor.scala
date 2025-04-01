@@ -6,6 +6,7 @@ import org.chipsalliance.cde.config.Parameters
 import coupledL2._
 import coupledL2.MetaData._
 import xs.utils.ChiselDB
+import xs.utils.debug.HAssert
 
 class MainpipeMoni(implicit p: Parameters) extends L2Bundle {
   val task_s2 = ValidIO(new TaskBundle())
@@ -59,11 +60,11 @@ class Monitor(implicit p: Parameters) extends L2Module {
 //    "C Release should always hit or have some MSHR meta nested, Tag %x Set %x",
 //    req_s3.tag, req_s3.set)
 
-  assert(RegNext(!(s3_valid && !mshr_req_s3 && dirResult_s3.hit &&
+  HAssert(RegNext(!(s3_valid && !mshr_req_s3 && dirResult_s3.hit &&
     meta_s3.state === TRUNK && !meta_s3.clients.orR)),
     "Trunk should have some client hit")
 
-  assert(RegNext(!(s3_valid && req_s3.fromC && dirResult_s3.hit &&
+  HAssert(RegNext(!(s3_valid && req_s3.fromC && dirResult_s3.hit &&
     !meta_s3.clients.orR)),
     "Invalid Client should not send Release")
 
@@ -101,4 +102,5 @@ class Monitor(implicit p: Parameters) extends L2Module {
 
     table.log(s3Info, s3_valid, s"L2${hartId}_${p(SliceIdKey)}", clock, reset)
   }
+  HAssert.placePipe(2)
 }
