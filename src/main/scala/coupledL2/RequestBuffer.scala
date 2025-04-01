@@ -24,6 +24,7 @@ import chisel3._
 import chisel3.util._
 import xs.utils.FastArbiter
 import xs.utils.perf.{XSPerfAccumulate, XSPerfHistogram, XSPerfMax}
+import xs.utils.debug.HAssert
 class ReqEntry(entries: Int = 4)(implicit p: Parameters) extends L2Bundle() {
   val valid    = Bool()
   val rdy      = Bool()
@@ -211,7 +212,7 @@ class RequestBuffer(flow: Boolean = true, entries: Int = 4)(implicit p: Paramete
     entry.waitMS  := conflictMask(in)
 
 //    entry.depMask := depMask
-    assert(PopCount(conflictMaskFromA(in)) <= 2.U)
+    HAssert(PopCount(conflictMaskFromA(in)) <= 2.U)
   }
 
   /* ======== Issue ======== */
@@ -314,7 +315,7 @@ class RequestBuffer(flow: Boolean = true, entries: Int = 4)(implicit p: Paramete
       case (e, t) =>
         when(e.valid) { t := t + 1.U }
         when(RegNext(RegNext(e.valid) && !e.valid)) { t := 0.U }
-        assert(t < 20000.U, "ReqBuf Leak")
+        HAssert(t < 20000.U, "ReqBuf Leak")
 
         val enable = RegNext(e.valid) && !e.valid
         XSPerfHistogram("reqBuf_timer", t, enable, 0, 20, 1, right_strict = true)
@@ -324,4 +325,5 @@ class RequestBuffer(flow: Boolean = true, entries: Int = 4)(implicit p: Paramete
         // assert !(all entries occupied for 100 cycles)
     }
   }
+  HAssert.placePipe(2)
 }

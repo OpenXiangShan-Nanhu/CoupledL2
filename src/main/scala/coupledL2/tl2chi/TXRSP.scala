@@ -21,6 +21,7 @@ import chisel3._
 import chisel3.util._
 import org.chipsalliance.cde.config.Parameters
 import coupledL2.TaskBundle
+import xs.utils.debug.HAssert
 
 class TXRSPBlockBundle(implicit p: Parameters) extends TXBlockBundle {
   val blockSinkBReqEntrance = Bool()
@@ -39,8 +40,8 @@ class TXRSP(implicit p: Parameters) extends TL2CHIL2Module {
     val toReqArb = Output(new TXRSPBlockBundle)
   })
 
-  assert(!io.pipeRsp.valid || io.pipeRsp.bits.toTXRSP, "txChannel is wrong for TXRSP")
-  assert(io.pipeRsp.ready, "TXRSP should never be full")
+  HAssert(!io.pipeRsp.valid || io.pipeRsp.bits.toTXRSP, "txChannel is wrong for TXRSP")
+  HAssert(io.pipeRsp.ready, "TXRSP should never be full")
   require(chiOpt.isDefined)
 
   // TODO: an mshrsAll-entry queue is too much, evaluate for a proper size later
@@ -59,7 +60,7 @@ class TXRSP(implicit p: Parameters) extends TL2CHIL2Module {
     PopCount(Cat(pipeStatus_s2.map(s => s.valid && Mux(s.bits.mshrTask, s.bits.toTXRSP, s.bits.fromB)))) +
     queueCnt
 
-  assert(inflightCnt <= mshrsAll.U, "in-flight overflow at TXRSP")
+  HAssert(inflightCnt <= mshrsAll.U, "in-flight overflow at TXRSP")
 
   val noSpaceForSinkBReq = inflightCnt >= mshrsAll.U
   val noSpaceForMSHRReq = inflightCnt >= (mshrsAll-2).U
@@ -92,4 +93,5 @@ class TXRSP(implicit p: Parameters) extends TL2CHIL2Module {
     // TODO: Finish this
     rsp
   }
+  HAssert.placePipe(2)
 }

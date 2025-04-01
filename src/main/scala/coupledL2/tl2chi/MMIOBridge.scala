@@ -28,6 +28,7 @@ import coupledL2.HasCoupledL2Parameters
 import coupledL2.{MemBackTypeMM, MemPageTypeNC}
 import xs.utils.{ParallelLookUp, ParallelPriorityMux, RRArbiterInit, SECDEDCode, ZeroExt}
 import xs.utils.perf.XSPerfAccumulate
+import xs.utils.debug.HAssert
 
 class MMIOBridge()(implicit p: Parameters) extends LazyModule
   with HasCoupledL2Parameters
@@ -172,7 +173,7 @@ class MMIOBridgeEntry(edge: TLEdgeIn)(implicit p: Parameters) extends TL2CHIL2Mo
       false.B
     }
     val poison = rxdat.bits.poison.getOrElse(false.B).orR
-    assert(!dataCheck, "UC should not have DataCheck error")
+    HAssert(!dataCheck, "UC should not have DataCheck error")
     denied := denied || nderr
     corrupt := corrupt || derr || nderr || dataCheck || poison
   }
@@ -331,7 +332,8 @@ class MMIOBridgeEntry(edge: TLEdgeIn)(implicit p: Parameters) extends TL2CHIL2Mo
   XSPerfAccumulate("mmio_read_retry", rxrsp.fire && rxrsp.bits.opcode === RetryAck && isRead)
   XSPerfAccumulate("mmio_write_retry", rxrsp.fire && rxrsp.bits.opcode === RetryAck && !isRead)
   XSPerfAccumulate("mmio_read_wait_pcrd", !w_pcrdgrant && isRead)
-  XSPerfAccumulate("mmio_write_wait_pcrd", !w_pcrdgrant && !isRead)  
+  XSPerfAccumulate("mmio_write_wait_pcrd", !w_pcrdgrant && !isRead)
+
 }
 
 class MMIOBridgeImp(outer: MMIOBridge) extends LazyModuleImp(outer)
@@ -394,9 +396,10 @@ class MMIOBridgeImp(outer: MMIOBridge) extends LazyModuleImp(outer)
     entry.io.chi.rx.dat.ready && io.rx.dat.bits.txnID === i.U
   }).orR
   io.rx.rsp.ready := true.B
-  assert(!io.rx.rsp.valid || Cat(entries.zipWithIndex.map { case (entry, i) =>
+  HAssert(!io.rx.rsp.valid || Cat(entries.zipWithIndex.map { case (entry, i) =>
     entry.io.chi.rx.rsp.ready && io.rx.rsp.bits.txnID === i.U }).orR)
 
+  HAssert.placePipe(3)
   dontTouch(io)
   dontTouch(bus)
 }
