@@ -24,8 +24,8 @@ class PrefetchReqBlocker(implicit p: Parameters) extends L2Module with HasCHIOpc
     val reqToSlice = Output(new PrefetchReq)
     val alreadyBlock = Output(Bool())
   })
-  val blockCircle = cacheParams.blockCircle
-  val counter = RegInit(0.U(log2Ceil(blockCircle).W))
+  val blockCycle = cacheParams.blockCycle
+  val counter = RegInit(0.U(log2Ceil(blockCycle).W))
 
   val needBlock = Wire(Bool())
   needBlock := io.shouldBlock || (counter =/= 0.U)
@@ -36,7 +36,7 @@ class PrefetchReqBlocker(implicit p: Parameters) extends L2Module with HasCHIOpc
 
   when(needBlock) {
     counter := counter + 1.U
-    when(counter === (blockCircle - 1).U) {
+    when(counter === (blockCycle - 1).U) {
       counter := 0.U
     }
   }

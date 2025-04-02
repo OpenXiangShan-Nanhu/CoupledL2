@@ -5,6 +5,7 @@ import chisel3.util._
 import org.chipsalliance.cde.config.Parameters
 import freechips.rocketchip.diplomacy._
 import freechips.rocketchip.tilelink._
+import xs.utils.debug.HAssert
 
 class Throttle(threshold: Int)(implicit p: Parameters) extends LazyModule {
   val node = TLIdentityNode()
@@ -14,8 +15,8 @@ class Throttle(threshold: Int)(implicit p: Parameters) extends LazyModule {
     val (out, edgeOut) = node.out.head
 
     // TL-UL is guaranteed
-    assert(!in.b.fire && !in.c.fire && !in.e.fire)
-    assert(!out.b.fire && !out.c.fire && !out.e.fire)
+    HAssert(!in.b.fire && !in.c.fire && !in.e.fire)
+    HAssert(!out.b.fire && !out.c.fire && !out.e.fire)
 
     val pendingCnt = RegInit(0.U(32.W))
     val (a_first, _, _, _) = edgeIn.count(in.a)
@@ -30,7 +31,7 @@ class Throttle(threshold: Int)(implicit p: Parameters) extends LazyModule {
         pendingCnt := pendingCnt + 1.U
       }
     }.elsewhen(new_resp) {
-      assert(pendingCnt > 0.U)
+      HAssert(pendingCnt > 0.U)
       pendingCnt := pendingCnt - 1.U
     }
 
@@ -40,6 +41,7 @@ class Throttle(threshold: Int)(implicit p: Parameters) extends LazyModule {
       out.a.valid := false.B
     }
   }
+  HAssert.placePipe(1)
 }
 
 object Throttle {

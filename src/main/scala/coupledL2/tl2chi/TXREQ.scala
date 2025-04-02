@@ -20,6 +20,7 @@ package coupledL2.tl2chi
 import chisel3._
 import chisel3.util._
 import org.chipsalliance.cde.config.Parameters
+import xs.utils.debug.HAssert
 
 class TXBlockBundle(implicit p: Parameters) extends TL2CHIL2Bundle {
   // val blockSinkBReqEntrance = Bool()
@@ -40,7 +41,7 @@ class TXREQ(implicit p: Parameters) extends TL2CHIL2Module {
     val sliceId = Input(UInt(bankBits.W))
   })
 
-  assert(!io.pipeReq.valid || io.pipeReq.ready, "TXREQ should always be ready for pipeline req")
+  HAssert(!io.pipeReq.valid || io.pipeReq.ready, "TXREQ should always be ready for pipeline req")
   require(chiOpt.isDefined)
 
   // TODO: an mshrsAll-entry queue is too much, evaluate for a proper size later
@@ -61,7 +62,7 @@ class TXREQ(implicit p: Parameters) extends TL2CHIL2Module {
     1.U - s2ReturnCredit.asUInt + //Fix Timing: always take credit and s2 return if not take 
     queueCnt
 
-  assert(inflightCnt <= mshrsAll.U, "in-flight overflow at TXREQ")
+  HAssert(inflightCnt <= mshrsAll.U, "in-flight overflow at TXREQ")
 
   val noSpace = inflightCnt >= mshrsAll.U
 
@@ -78,4 +79,5 @@ class TXREQ(implicit p: Parameters) extends TL2CHIL2Module {
   io.out.bits.tgtID := SAM(sam).lookup(io.out.bits.addr)
   io.out.bits.size := log2Ceil(blockBytes).U(SIZE_WIDTH.W) // TODO
   io.out.bits.addr := restoreAddressUInt(queue.io.deq.bits.addr, io.sliceId)
+  HAssert.placePipe(2)
 }

@@ -28,6 +28,7 @@ import coupledL2._
 import xs.utils.{ParallelMux, ParallelOR, ParallelPriorityMux}
 import xs.utils.perf.{HasPerfEvents, XSPerfAccumulate, XSPerfHistogram, XSPerfMax}
 import xs.utils.tl.MemReqSource
+import xs.utils.debug.HAssert
 
 class MSHRCtl(implicit p: Parameters) extends TL2CHIL2Module with HasCHIOpcodes with HasPerfEvents {
   val io = IO(new Bundle() {
@@ -110,6 +111,7 @@ class MSHRCtl(implicit p: Parameters) extends TL2CHIL2Module with HasCHIOpcodes 
   val a_mshrFull = pipeReqCount + mshrCount >= (mshrsAll-1).U // the last idle mshr should not be allocated for channel A req
   val mshrSelector = Module(new MSHRSelector())
   val selectedMSHROH = mshrSelector.io.out.bits
+  HAssert.placePipe(1)
 
   io.l2Miss := Cat(mshrs.map { m =>
     m.io.status.valid && m.io.status.bits.channel(0) && (
@@ -184,7 +186,7 @@ class MSHRCtl(implicit p: Parameters) extends TL2CHIL2Module with HasCHIOpcodes 
   io.nestedwbDataId.bits := ParallelPriorityMux(mshrs.zipWithIndex.map {
     case (mshr, i) => (mshr.io.nestedwbData, i.U)
   })
-  assert(RegNext(PopCount(mshrs.map(_.io.nestedwbData)) <= 1.U), "should only be one nestedwbData")
+  HAssert(RegNext(PopCount(mshrs.map(_.io.nestedwbData)) <= 1.U), cf"should only be one nestedwbData")
 
 
   /* Status for topDown monitor */
@@ -258,5 +260,6 @@ class MSHRCtl(implicit p: Parameters) extends TL2CHIL2Module with HasCHIOpcodes 
     ("l2_cache_long_miss", lmiss.reduce(_ + _))
   )
   generatePerfEvent()
+  HAssert.placePipe(2)
 }
 

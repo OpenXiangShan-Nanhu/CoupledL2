@@ -38,6 +38,7 @@ import scopt.Read
 import freechips.rocketchip.util.SeqToAugmentedSeq
 import xs.utils.sram.SRAMTemplate
 import xs.utils.tl.MemReqSource
+import xs.utils.debug.HAssert
 
 case class BOPParameters(
   virtualTrain: Boolean = true,
@@ -189,7 +190,7 @@ class RecentRequestTable(name: String)(implicit p: Parameters) extends BOPModule
   rrTable.io.r.req.bits.setIdx := idx(rAddr)
   rData := rrTable.io.r.resp.data(0)
 
-  assert(!RegNext(io.w.fire && io.r.req.fire), "single port SRAM should not read and write at the same time")
+  HAssert(!RegNext(io.w.fire && io.r.req.fire), "single port SRAM should not read and write at the same time")
 
   /** s0: req handshake */
   val s0_valid = rrTable.io.r.req.fire
@@ -214,6 +215,7 @@ class RecentRequestTable(name: String)(implicit p: Parameters) extends BOPModule
   e.addr := wAddr
   wrrt.log(e, io.w.valid && !io.r.req.valid, site = "RecentRequestTable", clock, reset)
 
+  HAssert.placePipe(2)
 }
 
 class OffsetScoreTable(name: String = "")(implicit p: Parameters) extends BOPModule {

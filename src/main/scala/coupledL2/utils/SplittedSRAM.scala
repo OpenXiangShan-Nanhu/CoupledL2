@@ -3,6 +3,8 @@ package coupledL2.utils
 import chisel3._
 import chisel3.util._
 import xs.utils.sram.{SRAMReadBus, SRAMWriteBus, SramHelper}
+import org.chipsalliance.cde.config.Parameters
+import xs.utils.debug.HAssert
 
 // split SRAM by set/way/data
 // 1. use lower-bits of set to select bank
@@ -19,7 +21,7 @@ class SplittedSRAM[T <: Data]
   clkDivBy2: Boolean = false, readMCP2: Boolean = false,
   hasMbist:Boolean = false, extraHold: Boolean = false,
   suffix: Option[String] = None
-)(implicit valName: sourcecode.FullName) extends Module {
+)(implicit p: Parameters, valName: sourcecode.FullName) extends Module {
   val io = IO(new Bundle() {
     val r = Flipped(new SRAMReadBus(gen, set, way))
     val w = Flipped(new SRAMWriteBus(gen, set, way))
@@ -81,7 +83,7 @@ class SplittedSRAM[T <: Data]
   } else ren_vec_1
 
   // only one read/write
-  assert({PopCount(ren_vec) <= 1.U})
+  HAssert({PopCount(ren_vec) <= 1.U})
 
   // TODO: we should consider the readys of all sram to be accessed, and orR them
   // but since waySplitted and dataSplitted smaller srams should have the same behavior
@@ -118,4 +120,5 @@ class SplittedSRAM[T <: Data]
   val valids = array.flatMap(_.flatMap(_.map(_.io.r.resp.valid)))
   io.r.resp.valid := Cat(valids).orR
   io.r.resp.data := Mux1H(ren_vec, allData).asTypeOf(Vec(way, gen))
+  HAssert.placePipe(1)
 }

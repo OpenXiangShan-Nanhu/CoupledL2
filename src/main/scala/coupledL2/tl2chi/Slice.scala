@@ -23,6 +23,7 @@ import xs.utils.mbist.MbistPipeline
 import org.chipsalliance.cde.config.Parameters
 import coupledL2._
 import coupledL2.prefetch.PrefetchIO
+import xs.utils.debug.HAssert
 
 class OuterBundle(implicit p: Parameters) extends DecoupledPortIO with BaseOuterBundle
 
@@ -220,4 +221,5 @@ class Slice()(implicit p: Parameters) extends BaseSlice[OuterBundle]
   /* ===== Hardware Performance Monitor ===== */
   val perfEvents = Seq(mshrCtl, mainPipe).flatMap(_.getPerfEvents)
   generatePerfEvent()
+  HAssert.placePipe(3)
 }

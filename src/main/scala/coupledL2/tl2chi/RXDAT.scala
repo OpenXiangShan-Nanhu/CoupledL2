@@ -23,6 +23,7 @@ import org.chipsalliance.cde.config.Parameters
 import coupledL2.{MSHRBufWrite, RespBundle}
 import xs.utils.SECDEDCode
 import xs.utils.debug.HardwareAssertion
+import xs.utils.debug.HAssert
 
 class RXDAT(implicit p: Parameters) extends TL2CHIL2Module {
   val io = IO(new Bundle() {
@@ -53,7 +54,7 @@ class RXDAT(implicit p: Parameters) extends TL2CHIL2Module {
     false.B
   }
   val poison = io.out.bits.poison.getOrElse(false.B).orR
-  assert(!(dataCheck && io.out.valid), "RXDAT(cached) should not have DataCheck error")
+  HAssert(!(dataCheck && io.out.valid), "RXDAT(cached) should not have DataCheck error")
 
   /* Write Refill Buffer*/
   io.refillBufWrite.valid := io.out.valid
@@ -88,4 +89,5 @@ class RXDAT(implicit p: Parameters) extends TL2CHIL2Module {
 
   io.out.ready := true.B
 
+  HAssert.placePipe(2)
 }

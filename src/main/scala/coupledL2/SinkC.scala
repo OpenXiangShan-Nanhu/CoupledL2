@@ -25,6 +25,7 @@ import org.chipsalliance.cde.config.Parameters
 import xs.utils.RRArbiterInit
 import xs.utils.perf.XSPerfAccumulate
 import xs.utils.tl.MemReqSource
+import xs.utils.debug.HAssert
 
 class PipeBufferResp(implicit p: Parameters) extends L2Bundle {
   val data = Vec(beatSize, UInt((beatBytes * 8).W))
@@ -112,7 +113,7 @@ class SinkC(implicit p: Parameters) extends L2Module {
         dataBuf(nextPtr)(beat) := io.c.bits.data
         beatValids(nextPtr)(beat) := true.B
       }.otherwise {
-        assert(last)
+        HAssert(last)
         dataBuf(nextPtrReg)(beat) := io.c.bits.data
         beatValids(nextPtrReg)(beat) := true.B
       }
@@ -202,4 +203,5 @@ class SinkC(implicit p: Parameters) extends L2Module {
   XSPerfAccumulate("NewDataNestC", io.refillBufWrite.valid)
   //!!WARNING: TODO: if this is zero, that means fucntion [Release-new-data written into refillBuf]
   // is never tested, and may have flaws
+  HAssert.placePipe(2)
 }

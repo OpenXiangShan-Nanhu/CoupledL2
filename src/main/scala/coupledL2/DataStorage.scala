@@ -22,6 +22,7 @@ import chisel3.util._
 import org.chipsalliance.cde.config.Parameters
 import xs.utils.mbist.MbistPipeline
 import coupledL2.utils.SplittedSRAM
+import xs.utils.debug.HAssert
 
 class DSRequest(implicit p: Parameters) extends L2Bundle {
   val way = UInt(wayBits.W)
@@ -119,12 +120,13 @@ class DataStorage(implicit p: Parameters) extends L2Module {
   io.rdata := dataRead
   io.error := error
 
-  assert(!io.en || !RegNext(io.en, false.B),
+  HAssert(!io.en || !RegNext(io.en, false.B),
     "Continuous SRAM req prohibited under MCP2!")
 
-  assert(!(RegNext(io.en) && (io.req.asUInt =/= RegNext(io.req.asUInt))),
+  HAssert(!(RegNext(io.en) && (io.req.asUInt =/= RegNext(io.req.asUInt))),
     s"DataStorage req fails to hold for 2 cycles!")
 
-  assert(!(RegNext(io.en && io.req.bits.wen) && (io.wdata.asUInt =/= RegNext(io.wdata.asUInt))),
+  HAssert(!(RegNext(io.en && io.req.bits.wen) && (io.wdata.asUInt =/= RegNext(io.wdata.asUInt))),
     s"DataStorage wdata fails to hold for 2 cycles!")
+  HAssert.placePipe(2)
 }
