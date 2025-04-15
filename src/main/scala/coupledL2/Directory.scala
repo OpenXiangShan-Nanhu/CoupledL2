@@ -19,12 +19,16 @@ package coupledL2
 
 import chisel3._
 import chisel3.util._
-import utility.mbist.MbistPipeline
+import xs.utils.mbist.MbistPipeline
 import coupledL2.utils._
-import utility.{ParallelPriorityMux, RegNextN, XSPerfAccumulate, Code, SRAMTemplate}
+import xs.utils.{Code, HoldUnless, ParallelPriorityMux, RegNextN}
+import xs.utils.perf.XSPerfAccumulate
 import org.chipsalliance.cde.config.Parameters
-import coupledL2.prefetch.PfSource
 import freechips.rocketchip.tilelink.TLMessages._
+import xs.utils.sram.SRAMTemplate
+import xs.utils.cache.prefetch.PfSource
+import xs.utils.cache.MetaData
+import xs.utils.cache.common.L2ParamKey
 
 class MetaEntry(implicit p: Parameters) extends L2Bundle {
   val dirty = Bool()
@@ -140,37 +144,27 @@ class Directory(implicit p: Parameters) extends L2Module {
 
   // val tagArray  = Module(new SRAMTemplate(UInt(tagBits.W), sets, ways, singlePort = true))
   private val mbist = p(L2ParamKey).hasMbist
-  private val hasSramCtl = p(L2ParamKey).hasSramCtl
   val tagArray = if (enableTagECC) {
-    Module(new SplittedSRAM(
+    Module(new SRAMTemplate(
       gen = UInt((tagBankSplit * encTagBankBits).W),
       set = sets,
       way = ways,
-      waySplit = 2,
-      dataSplit = if (enableTagSRAMSplit) {
-        tagSRAMSplit
-      } else {
-        1
-      },
       singlePort = true,
-      readMCP2 = false,
       hasMbist = mbist,
-      hasSramCtl = hasSramCtl
+      suffix = "_l2c_tag"
     ))
   } else {
-    Module(new SplittedSRAM(
+    Module(new SRAMTemplate(
       gen = UInt(tagBits.W),
       set = sets,
       way = ways,
-      waySplit = 2,
       singlePort = true,
-      readMCP2 = false,
       hasMbist = mbist,
-      hasSramCtl = hasSramCtl
+      suffix = "_l2c_tag"
     ))
   }
 
-  val metaArray = Module(new SRAMTemplate(new MetaEntry, sets, ways, singlePort = true, hasMbist = mbist, hasSramCtl = hasSramCtl))
+  val metaArray = Module(new SRAMTemplate(new MetaEntry, sets, ways, singlePort = true, hasMbist = mbist , suffix = "_l2c_meta"))
 
   val tagRead_s3 = Wire(Vec(ways, UInt(tagBits.W)))
   val metaRead = Wire(Vec(ways, new MetaEntry()))
@@ -183,7 +177,7 @@ class Directory(implicit p: Parameters) extends L2Module {
   val repl = ReplacementPolicy.fromString(cacheParams.replacement, ways)
   val random_repl = cacheParams.replacement == "random"
   val replacer_sram_opt = if(random_repl) None else
-    Some(Module(new SRAMTemplate(UInt(repl.nBits.W), sets, 1, singlePort = true, shouldReset = true, hasMbist = mbist, hasSramCtl = hasSramCtl)))
+    Some(Module(new SRAMTemplate(UInt(repl.nBits.W), sets, 1, singlePort = true, shouldReset = true, hasMbist = mbist , suffix = "_l2c_repl")))
 
   /* ====== Generate response signals ====== */
   // hit/way calculation in stage 3, Cuz SRAM latency is high under high frequency
@@ -351,7 +345,7 @@ class Directory(implicit p: Parameters) extends L2Module {
   // hit-Promotion, miss-Insertion for RRIP
   // origin-bit marks whether the data_block is reused
   val origin_bit_opt = if(random_repl) None else
-    Some(Module(new SRAMTemplate(Bool(), sets, ways, singlePort = true, shouldReset = true, hasMbist = mbist, hasSramCtl = hasSramCtl)))
+    Some(Module(new SRAMTemplate(Bool(), sets, ways, singlePort = true, shouldReset = true, hasMbist = mbist , suffix = "_l2c_ori")))
   val origin_bits_r = origin_bit_opt.get.io.r(io.read.fire, io.read.bits.set).resp.data
   val origin_bits_hold = Wire(Vec(ways, Bool()))
   origin_bits_hold := HoldUnless(origin_bits_r, RegNext(io.read.fire, false.B))
@@ -371,7 +365,7 @@ class Directory(implicit p: Parameters) extends L2Module {
     (!refillReqValid_s3 && req_s3.replacerInfo.channel(0) && req_s3.replacerInfo.opcode === Hint) || (req_s3.replacerInfo.channel(2) && metaAll_s3(way_s3).prefetch.getOrElse(false.B)) || (refillReqValid_s3 && req_s3.replacerInfo.refill_prefetch),
     req_s3.refill
   )
-  private val mbistPl = MbistPipeline.PlaceMbistPipeline(1, "L2Directory", mbist)
+  private val mbistPl = MbistPipeline.PlaceMbistPipeline(1, "MbistPipeL2Directory", mbist)
   if(cacheParams.replacement == "srrip"){
     val next_state_s3 = repl.get_next_state(repl_state_s3, way_s3, hit_s3, inv, rrip_req_type)
     val repl_init = Wire(Vec(ways, UInt(2.W)))

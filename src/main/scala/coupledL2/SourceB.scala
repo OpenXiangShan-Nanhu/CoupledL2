@@ -23,7 +23,9 @@ import chisel3.util._
 import coupledL2.utils._
 import freechips.rocketchip.tilelink._
 import org.chipsalliance.cde.config.Parameters
-import utility._
+import xs.utils._
+import xs.utils.perf.{XSPerfAccumulate, XSPerfHistogram}
+import xs.utils.debug.HAssert
 
 class GrantStatus(implicit p: Parameters) extends L2Bundle {
   val valid  = Bool()
@@ -89,12 +91,12 @@ class SourceB(implicit p: Parameters) extends L2Module {
   val insertIdx = PriorityEncoder(probes.map(!_.valid))
   val alloc     = !full && io.task.valid
   when(alloc) {
-    val p = probes(insertIdx)
-    p.valid := true.B
-    p.rdy   := !conflict
-    p.waitG := OHToUInt(conflictMask)
-    p.task  := io.task.bits
-    assert(PopCount(conflictMask) <= 1.U)
+    val probeEntry = probes(insertIdx)
+    probeEntry.valid := true.B
+    probeEntry.rdy   := !conflict
+    probeEntry.waitG := OHToUInt(conflictMask)
+    probeEntry.task  := io.task.bits
+    HAssert(PopCount(conflictMask) <= 1.U)
   }
 
   /* ======== Issue ======== */
@@ -126,4 +128,5 @@ class SourceB(implicit p: Parameters) extends L2Module {
     val update = PopCount(probes.map(_.valid)) === i.U
     XSPerfAccumulate(s"probe_buffer_util_$i", update)
   }
+  HAssert.placePipe(1)
 }

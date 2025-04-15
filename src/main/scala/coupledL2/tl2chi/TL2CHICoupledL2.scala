@@ -19,23 +19,23 @@ package coupledL2.tl2chi
 
 import chisel3._
 import chisel3.util._
-import utility.{FastArbiter, Pipeline, ParallelPriorityMux, RegNextN, RRArbiterInit, XSPerfAccumulate}
+import coupledL2._
 import freechips.rocketchip.diplomacy._
 import freechips.rocketchip.tilelink._
-import freechips.rocketchip.tilelink.TLMessages._
-import freechips.rocketchip.util._
-import org.chipsalliance.cde.config.{Parameters, Field}
-import scala.math.max
-import coupledL2._
-import coupledL2.prefetch._
+import org.chipsalliance.cde.config.{Field, Parameters}
+import xs.utils.RRArbiterInit
+import xs.utils.debug.HAssert
+import xs.utils.perf.XSPerfAccumulate
 
 abstract class TL2CHIL2Bundle(implicit val p: Parameters) extends Bundle
   with HasCoupledL2Parameters
   with HasCHIMsgParameters
+
 abstract class TL2CHIL2Module(implicit val p: Parameters) extends Module
   with HasCoupledL2Parameters
   with HasCHIMsgParameters
 
+case object DecoupledCHI extends Field[Boolean](false)
 
 class TL2CHICoupledL2(implicit p: Parameters) extends CoupledL2Base {
 
@@ -68,21 +68,60 @@ class TL2CHICoupledL2(implicit p: Parameters) extends CoupledL2Base {
   class CoupledL2Imp(wrapper: LazyModule) extends BaseCoupledL2Imp(wrapper)
     with HasCHIOpcodes {
 
-    val io_chi = IO(new PortIO)
+    val io_chi = if(p(DecoupledCHI)) IO(new DecoupledPortIO) else IO(new PortIO)
     val io_nodeID = IO(Input(UInt()))
     val io_cpu_halt = Option.when(cacheParams.enableL2Flush) (IO(Input(Bool())))
 
+    val prefBlocker = Module(new PrefetchReqBlocker()(pftParams))
     // Check port width
-    require(io_chi.tx.rsp.getWidth == io_chi.rx.rsp.getWidth);
-    require(io_chi.tx.dat.getWidth == io_chi.rx.dat.getWidth);
+    private val txreq = Wire(Decoupled(new CHIREQ))
+    private val txrsp = Wire(Decoupled(new CHIRSP))
+    private val txdat = Wire(Decoupled(new CHIDAT))
+    private val rxrsp = Wire(Decoupled(new CHIRSP))
+    private val rxdat = Wire(Decoupled(new CHIDAT))
+    private val rxsnp = Wire(Decoupled(new CHISNP))
+    io_chi match {
+      case chi: DecoupledPortIO =>
+        println(s"CHI Issue Version: ${p(CHIIssue)}")
+        println(s"CHI Interface: Valid-Ready")
+        println(s"CHI REQ Flit Width: ${chi.tx.req.bits.getWidth}")
+        println(s"CHI RSP Flit Width: ${chi.tx.rsp.bits.getWidth}")
+        println(s"CHI SNP Flit Width: ${chi.rx.snp.bits.getWidth}")
+        println(s"CHI DAT Flit Width: ${chi.rx.dat.bits.getWidth}")
+        println(s"CHI Port Width: ${chi.getWidth}")
+        chi.tx.req <> Queue(txreq)
+        chi.tx.rsp <> Queue(txrsp)
+        chi.tx.dat <> Queue(txdat)
+        rxrsp <> Queue(chi.rx.rsp)
+        rxdat <> Queue(chi.rx.dat)
+        rxsnp <> Queue(chi.rx.snp)
 
-    // Display info
-    println(s"CHI Issue Version: ${p(CHIIssue)}")
-    println(s"CHI REQ Flit Width: ${io_chi.tx.req.flit.getWidth}")
-    println(s"CHI RSP Flit Width: ${io_chi.tx.rsp.flit.getWidth}")
-    println(s"CHI SNP Flit Width: ${io_chi.rx.snp.flit.getWidth}")
-    println(s"CHI DAT Flit Width: ${io_chi.rx.dat.flit.getWidth}")
-    println(s"CHI Port Width: ${io_chi.getWidth}")
+      case chi: PortIO =>
+        require(chi.tx.rsp.getWidth == chi.rx.rsp.getWidth);
+        require(chi.tx.dat.getWidth == chi.rx.dat.getWidth);
+
+        println(s"CHI Issue Version: ${p(CHIIssue)}")
+        println(s"CHI Interface: Token-Credit")
+        println(s"CHI REQ Flit Width: ${chi.tx.req.flit.getWidth}")
+        println(s"CHI RSP Flit Width: ${chi.tx.rsp.flit.getWidth}")
+        println(s"CHI SNP Flit Width: ${chi.rx.snp.flit.getWidth}")
+        println(s"CHI DAT Flit Width: ${chi.rx.dat.flit.getWidth}")
+        println(s"CHI Port Width: ${chi.getWidth}")
+        val linkMonitor = Module(new LinkMonitor)
+        linkMonitor.io.in.tx.req <> txreq
+        linkMonitor.io.in.tx.rsp <> txrsp
+        linkMonitor.io.in.tx.dat <> txdat
+        rxsnp <> linkMonitor.io.in.rx.snp
+        rxrsp <> linkMonitor.io.in.rx.rsp
+        rxdat <> linkMonitor.io.in.rx.dat
+        chi <> linkMonitor.io.out
+        linkMonitor.io.nodeID := io_nodeID
+        /* exit coherency when: l2 flush of all slices is done and core is in WFI state */
+        linkMonitor.io.exitco.foreach {
+          _ :=
+            Cat(slices.zipWithIndex.map { case (s, i) => s.io.l2FlushDone.getOrElse(false.B) }).andR && io_cpu_halt.getOrElse(false.B)
+        }
+    }
 
     println(s"MMIO:")
     mmioNode.edges.in.headOption.foreach { n =>
@@ -129,22 +168,18 @@ class TL2CHICoupledL2(implicit p: Parameters) extends CoupledL2Base {
       case slices: Seq[Slice] =>
         // TXREQ
         val txreq_arb = Module(new RRArbiterInit(new CHIREQ, slices.size + 1)) // plus 1 for MMIO
-        val txreq = Wire(DecoupledIO(new CHIREQ))
         slices.zip(txreq_arb.io.in.init).foreach { case (s, in) => in <> s.io.out.tx.req }
         txreq_arb.io.in.last <> mmio.io.tx.req
         txreq <> txreq_arb.io.out
         txreq.bits.txnID := setSliceID(txreq_arb.io.out.bits.txnID, txreq_arb.io.chosen, mmio.io.tx.req.fire)
 
         // TXRSP
-        val txrsp = Wire(DecoupledIO(new CHIRSP))
         fastArb(slices.map(_.io.out.tx.rsp), txrsp, Some("txrsp"))
 
         // TXDAT
-        val txdat = Wire(DecoupledIO(new CHIDAT))
         fastArb(slices.map(_.io.out.tx.dat) :+ mmio.io.tx.dat, txdat, Some("txdat"))
 
         // RXSNP
-        val rxsnp = Wire(DecoupledIO(new CHISNP))
         val rxsnpSliceID = if (banks <= 1) 0.U else (rxsnp.bits.addr >> (offsetBits - 3))(bankBits - 1, 0)
         slices.zipWithIndex.foreach { case (s, i) =>
           s.io.out.rx.snp.valid := rxsnp.valid && rxsnpSliceID === i.U
@@ -153,7 +188,6 @@ class TL2CHICoupledL2(implicit p: Parameters) extends CoupledL2Base {
         rxsnp.ready := Cat(slices.zipWithIndex.map { case (s, i) => s.io.out.rx.snp.ready && rxsnpSliceID === i.U }).orR
 
         // RXRSP
-        val rxrsp = Wire(DecoupledIO(new CHIRSP))
         val rxrspIsMMIO = rxrsp.bits.txnID.head(1).asBool
         val isPCrdGrant = rxrsp.valid && rxrsp.bits.opcode === PCrdGrant
 
@@ -230,10 +264,13 @@ class TL2CHICoupledL2(implicit p: Parameters) extends CoupledL2Base {
         )
 
         // RXDAT
-        val rxdat = Wire(DecoupledIO(new CHIDAT))
         val rxdatIsMMIO = rxdat.bits.txnID.head(1).asBool
         val rxdatSliceID = getSliceID(rxdat.bits.txnID)
         slices.zipWithIndex.foreach { case (s, i) =>
+          s.io.prefetch.get.req.valid := !prefBlocker.io.alreadyBlock &&
+            prefetcher.get.io.req.valid &&
+            bank_eq(Cat(prefetcher.get.io.req.bits.tag, prefetcher.get.io.req.bits.set), i, bankBits)
+          s.io.prefetch.get.req.bits:= prefetcher.get.io.req.bits
           s.io.out.rx.dat.valid := rxdat.valid && rxdatSliceID === i.U && !rxdatIsMMIO
           s.io.out.rx.dat.bits := rxdat.bits
           s.io.out.rx.dat.bits.txnID := restoreTXNID(rxdat.bits.txnID)
@@ -246,26 +283,18 @@ class TL2CHICoupledL2(implicit p: Parameters) extends CoupledL2Base {
           mmio.io.rx.dat.ready,
           Cat(slices.zipWithIndex.map { case (s, i) => s.io.out.rx.dat.ready && rxdatSliceID === i.U}).orR
         )
-
-        val linkMonitor = Module(new LinkMonitor)
-        linkMonitor.io.in.tx.req <> txreq
-        linkMonitor.io.in.tx.rsp <> txrsp
-        linkMonitor.io.in.tx.dat <> txdat
-        rxsnp <> linkMonitor.io.in.rx.snp
-        rxrsp <> linkMonitor.io.in.rx.rsp
-        rxdat <> linkMonitor.io.in.rx.dat
-        io_chi <> linkMonitor.io.out
-        linkMonitor.io.nodeID := io_nodeID
-        /* exit coherency when: l2 flush of all slices is done and core is in WFI state */
-        linkMonitor.io.exitco.foreach { _ :=
-          Cat(slices.zipWithIndex.map { case (s, i) => s.io.l2FlushDone.getOrElse(false.B)}).andR && io_cpu_halt.getOrElse(false.B)
-        }
+        prefBlocker.io.rxrsp.valid := rxrsp.valid
+        prefBlocker.io.rxrsp.bits := rxrsp.bits
+        prefBlocker.io.rxdat.valid := rxdat.valid
+        prefBlocker.io.rxdat.bits := rxdat.bits
 
         /**
           * performance counters
           */
         XSPerfAccumulate("pcrd_count", pCrdQueue.io.enq.fire)
     }
+
+    HAssert.placePipe(4)
   }
 
   lazy val module = new CoupledL2Imp(this)

@@ -26,7 +26,8 @@
 
 package coupledL2.prefetch
 
-import utility.{ChiselDB, Constantin, MemReqSource, ParallelPriorityMux, RRArbiterInit, SRAMTemplate, XSPerfAccumulate}
+import xs.utils.{ChiselDB, Constantin, ParallelPriorityMux, RRArbiterInit}
+import xs.utils.perf.XSPerfAccumulate
 import org.chipsalliance.cde.config.Parameters
 import chisel3.DontCare.:=
 import chisel3._
@@ -35,41 +36,10 @@ import coupledL2.{HasCoupledL2Parameters, L2TlbReq, L2ToL1TlbIO, TlbCmd, Pbmt}
 import coupledL2.utils.ReplacementPolicy
 import scopt.Read
 import freechips.rocketchip.util.SeqToAugmentedSeq
-
-case class BOPParameters(
-  virtualTrain: Boolean = true,
-  rrTableEntries: Int = 256,
-  rrTagBits:      Int = 12,
-  scoreBits:      Int = 5,
-  roundMax:       Int = 50,
-  badScore:       Int = 2,
-  tlbReplayCnt:   Int = 10,
-  dQEntries: Int = 16,
-  dQLatency: Int = 300,
-  dQMaxLatency: Int = 512,
-  offsetList: Seq[Int] = Seq(
-    -256, -250, -243, -240, -225, -216, -200,
-    -192, -180, -162, -160, -150, -144, -135, -128,
-    -125, -120, -108, -100, -96, -90, -81, -80,
-    -75, -72, -64, -60, -54, -50, -48, -45,
-    -40, -36, -32, -30, -27, -25, -24, -20,
-    -18, -16, -15, -12, -10, -9, -8, -6,
-    -5, -4, -3, -2, -1,
-    1, 2, 3, 4, 5, 6, 8,
-    9, 10, 12, 15, 16, 18, 20, 24,
-    25, 27, 30, 32, 36, 40, 45, 48,
-    50, 54, 60, 64, 72, 75, 80, 81,
-    90, 96, 100, 108, 120, 125, 128, 135,
-    144, 150, 160, 162, 180, 192, 200, 216,
-    225, 240, 243, 250/*, 256*/
-  )
-  )
-    extends PrefetchParameters {
-  override val hasPrefetchBit:  Boolean = true
-  override val hasPrefetchSrc:  Boolean = true
-  override val inflightEntries: Int = 16
-}
-
+import xs.utils.sram.SRAMTemplate
+import xs.utils.tl.MemReqSource
+import xs.utils.debug.HAssert
+import xs.utils.cache.prefetch.BOPParameters
 trait HasBOPParams extends HasPrefetcherHelper {
   def bopParams = prefetchers.find {
       case p: BOPParameters => true
@@ -178,7 +148,7 @@ class RecentRequestTable(name: String)(implicit p: Parameters) extends BOPModule
       shouldReset = true,
       singlePort = true,
       hasMbist = cacheParams.hasMbist,
-      hasSramCtl = cacheParams.hasSramCtl
+      suffix = "_l2c_rrt"
     )
   )
 
@@ -194,7 +164,7 @@ class RecentRequestTable(name: String)(implicit p: Parameters) extends BOPModule
   rrTable.io.r.req.bits.setIdx := idx(rAddr)
   rData := rrTable.io.r.resp.data(0)
 
-  assert(!RegNext(io.w.fire && io.r.req.fire), "single port SRAM should not read and write at the same time")
+  HAssert(!RegNext(io.w.fire && io.r.req.fire), "single port SRAM should not read and write at the same time")
 
   /** s0: req handshake */
   val s0_valid = rrTable.io.r.req.fire
@@ -219,6 +189,7 @@ class RecentRequestTable(name: String)(implicit p: Parameters) extends BOPModule
   e.addr := wAddr
   wrrt.log(e, io.w.valid && !io.r.req.valid, site = "RecentRequestTable", clock, reset)
 
+  HAssert.placePipe(2)
 }
 
 class OffsetScoreTable(name: String = "")(implicit p: Parameters) extends BOPModule {
