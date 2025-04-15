@@ -21,8 +21,8 @@ import chisel3._
 import chisel3.util._
 import org.chipsalliance.cde.config.Parameters
 import freechips.rocketchip.tilelink.TLPermissions._
-import utility.MemReqSource
 import coupledL2._
+import xs.utils.tl.MemReqSource
 
 // MSHR exposes signals to MSHRCtl
 class MSHRStatus(implicit p: Parameters) extends L2Bundle with HasTLChannelBits {

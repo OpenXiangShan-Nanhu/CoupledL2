@@ -19,14 +19,16 @@ package coupledL2.tl2tl
 
 import chisel3._
 import chisel3.util._
-import coupledL2.MetaData._
-import utility.{MemReqSource, ParallelLookUp, ParallelPriorityMux}
 import freechips.rocketchip.tilelink._
 import freechips.rocketchip.tilelink.TLMessages._
 import freechips.rocketchip.tilelink.TLPermissions._
 import org.chipsalliance.cde.config.Parameters
 import coupledL2._
-import coupledL2.prefetch.{PfSource, PrefetchTrain}
+import xs.utils.cache.prefetch.{PfSource}
+import coupledL2.prefetch.PrefetchTrain
+import xs.utils.cache.MetaData._
+import xs.utils.{ParallelLookUp, ParallelPriorityMux}
+import xs.utils.tl.MemReqSource
 
 class MSHRTasks(implicit p: Parameters) extends L2Bundle {
   // outer

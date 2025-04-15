@@ -19,12 +19,14 @@ package coupledL2.tl2tl
 
 import chisel3._
 import chisel3.util._
-import utility._
 import org.chipsalliance.cde.config.Parameters
 import freechips.rocketchip.tilelink._
 import freechips.rocketchip.tilelink.TLMessages._
 import coupledL2._
 import coupledL2.prefetch.PrefetchTrain
+import xs.utils.{ParallelMux, ParallelOR, ParallelPriorityMux}
+import xs.utils.perf.{HasPerfEvents, XSPerfAccumulate, XSPerfHistogram, XSPerfMax}
+import xs.utils.tl.MemReqSource
 
 class MSHRSelector(implicit p: Parameters) extends L2Module {
   val io = IO(new Bundle() {
