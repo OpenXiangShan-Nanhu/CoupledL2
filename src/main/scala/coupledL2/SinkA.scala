@@ -24,8 +24,11 @@ import freechips.rocketchip.tilelink._
 import freechips.rocketchip.tilelink.TLMessages._
 import freechips.rocketchip.tilelink.TLHints._
 import coupledL2.prefetch.PrefetchReq
-import huancun.{AliasKey, PrefetchKey}
-import utility.{MemReqSource, XSPerfAccumulate}
+import xs.utils.tl.{MemReqSource, ReqSourceKey}
+import xs.utils.perf.XSPerfAccumulate
+import xs.utils.debug.HAssert
+import xs.utils.cache.common._
+
 
 class SinkA(implicit p: Parameters) extends L2Module {
   val io = IO(new Bundle() {
@@ -34,7 +37,7 @@ class SinkA(implicit p: Parameters) extends L2Module {
     val task = DecoupledIO(new TaskBundle)
     val cmoAll = Option.when(cacheParams.enableL2Flush) (new IOCMOAll)
   })
-  assert(!(io.a.valid && (io.a.bits.opcode === PutFullData ||
+  HAssert(!(io.a.valid && (io.a.bits.opcode === PutFullData ||
                           io.a.bits.opcode === PutPartialData)),
     "no Put");
 
@@ -81,7 +84,7 @@ class SinkA(implicit p: Parameters) extends L2Module {
     task.tagWen := false.B
     task.dsWen := false.B
     task.wayMask := 0.U(cacheParams.ways.W)
-    task.reqSource := a.user.lift(utility.ReqSourceKey).getOrElse(MemReqSource.NoWhere.id.U)
+    task.reqSource := a.user.lift(ReqSourceKey).getOrElse(MemReqSource.NoWhere.id.U)
     task.replTask := false.B
     task.vaddr.foreach(_ := a.user.lift(VaddrKey).getOrElse(0.U))
     //miss acquire keyword
@@ -212,4 +215,5 @@ class SinkA(implicit p: Parameters) extends L2Module {
   XSPerfAccumulate("sinkA_put_stall_by_mainpipe", stall &&
     (io.task.bits.opcode === PutFullData || io.task.bits.opcode === PutPartialData))
   prefetchOpt.foreach { _ => XSPerfAccumulate("sinkA_prefetch_stall_by_mainpipe", stall && io.task.bits.opcode === Hint) }
+  HAssert.placePipe(2)
 }

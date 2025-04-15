@@ -19,9 +19,10 @@ package coupledL2.tl2chi
 
 import chisel3._
 import chisel3.util._
-import utility._
 import org.chipsalliance.cde.config.Parameters
-import coupledL2.{RespBundle, MSHRBufWrite}
+import coupledL2.{MSHRBufWrite, RespBundle}
+import xs.utils.SECDEDCode
+import xs.utils.debug.HAssert
 
 class RXDAT(implicit p: Parameters) extends TL2CHIL2Module {
   val io = IO(new Bundle() {
@@ -52,7 +53,7 @@ class RXDAT(implicit p: Parameters) extends TL2CHIL2Module {
     false.B
   }
   val poison = io.out.bits.poison.getOrElse(false.B).orR
-  assert(!(dataCheck && io.out.valid), "RXDAT(cached) should not have DataCheck error")
+  HAssert(!(dataCheck && io.out.valid), "RXDAT(cached) should not have DataCheck error")
 
   /* Write Refill Buffer*/
   io.refillBufWrite.valid := io.out.valid
@@ -83,7 +84,9 @@ class RXDAT(implicit p: Parameters) extends TL2CHIL2Module {
   io.in.respInfo.denied           := io.out.bits.respErr === RespErrEncodings.NDERR
   io.in.respInfo.corrupt          := io.out.bits.respErr === RespErrEncodings.DERR || io.out.bits.respErr === RespErrEncodings.NDERR || dataCheck || poison
   io.in.respInfo.dataCheckErr.get := dataCheck
+  io.in.respInfo.cBusy.foreach(_  := io.out.bits.cBusy.get)
 
   io.out.ready := true.B
 
+  HAssert.placePipe(2)
 }

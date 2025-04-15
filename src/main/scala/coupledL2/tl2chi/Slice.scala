@@ -19,10 +19,12 @@ package coupledL2.tl2chi
 
 import chisel3._
 import chisel3.util._
-import utility.mbist.MbistPipeline
+import xs.utils.mbist.MbistPipeline
 import org.chipsalliance.cde.config.Parameters
 import coupledL2._
 import coupledL2.prefetch.PrefetchIO
+import xs.utils.debug.HAssert
+import xs.utils.cache.common.L2ParamKey
 
 class OuterBundle(implicit p: Parameters) extends DecoupledPortIO with BaseOuterBundle
 
@@ -59,7 +61,7 @@ class Slice()(implicit p: Parameters) extends BaseSlice[OuterBundle]
   val mainPipe = Module(new MainPipe())
   val reqBuf = Module(new RequestBuffer())
   val mshrCtl = Module(new MSHRCtl())
-  private val mbistPl = MbistPipeline.PlaceMbistPipeline(2, "L2Slice", p(L2ParamKey).hasMbist)
+  private val mbistPl = MbistPipeline.PlaceMbistPipeline(2, "MbistPipeL2Slice", p(L2ParamKey).hasMbist)
   sinkC.io.msInfo := mshrCtl.io.msInfo
 
   grantBuf.io.d_task <> mainPipe.io.toSourceD
@@ -220,4 +222,5 @@ class Slice()(implicit p: Parameters) extends BaseSlice[OuterBundle]
   /* ===== Hardware Performance Monitor ===== */
   val perfEvents = Seq(mshrCtl, mainPipe).flatMap(_.getPerfEvents)
   generatePerfEvent()
+  HAssert.placePipe(3)
 }

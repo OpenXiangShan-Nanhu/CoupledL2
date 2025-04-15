@@ -19,10 +19,11 @@ package coupledL2
 
 import chisel3._
 import chisel3.util._
-import utility._
+import xs.utils._
 import org.chipsalliance.cde.config.Parameters
 import freechips.rocketchip.tilelink.TLMessages._
 import coupledL2.utils._
+import xs.utils.debug.HAssert
 
 class HintQueueEntry(implicit p: Parameters) extends L2Bundle {
   val source = UInt(sourceIdBits.W)
@@ -107,8 +108,8 @@ class CustomL1Hint(implicit p: Parameters) extends L2Module {
   hint_s1Queue.io.enq.bits.isKeyword := enqKeyWord_s1
   hint_s1Queue.io.deq.ready := hintQueue.io.enq.ready && !enqValid_s3
   // WARNING:TODO: ensure queue will never overflow
-  assert(hint_s1Queue.io.enq.ready, "hint_s1Queue should never be full")
-  assert(hintQueue.io.enq.ready, "hintQueue should never be full")
+  HAssert(hint_s1Queue.io.enq.ready, "hint_s1Queue should never be full")
+  HAssert(hintQueue.io.enq.ready, "hintQueue should never be full")
 
   hintQueue.io.enq.valid := enqValid_s3 || hint_s1Queue.io.deq.valid
   hintQueue.io.enq.bits.opcode := Mux(enqValid_s3, enqOpcode_s3, hint_s1Queue.io.deq.bits.opcode)
@@ -119,4 +120,5 @@ class CustomL1Hint(implicit p: Parameters) extends L2Module {
   io.l1Hint.valid := hintQueue.io.deq.valid && hintQueue.io.deq.bits.opcode === GrantData
   io.l1Hint.bits.sourceId := hintQueue.io.deq.bits.source
   io.l1Hint.bits.isKeyword := hintQueue.io.deq.bits.isKeyword
+  HAssert.placePipe(1)
 }

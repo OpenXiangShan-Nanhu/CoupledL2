@@ -19,19 +19,23 @@ package coupledL2.tl2chi
 
 import chisel3._
 import chisel3.util._
-import coupledL2.MetaData._
-import utility.{MemReqSource, ParallelLookUp, ParallelMux, ParallelPriorityMux}
+
+import xs.utils.{ParallelLookUp, ParallelMux, ParallelPriorityMux}
 import freechips.rocketchip.tilelink._
 import freechips.rocketchip.tilelink.TLMessages._
 import freechips.rocketchip.tilelink.TLPermissions._
 import org.chipsalliance.cde.config.Parameters
-import coupledL2.prefetch.{PfSource, PrefetchTrain}
+
+import coupledL2._
 import coupledL2.tl2chi.CHICohStates._
 import coupledL2.tl2chi.CHIChannel
 import coupledL2.tl2chi.RespErrEncodings._
-import coupledL2.MetaData._
-import coupledL2._
+import coupledL2.prefetch.PrefetchTrain
 
+import xs.utils.cache.MetaData._
+import xs.utils.cache.prefetch.{PfSource}
+import xs.utils.tl.MemReqSource
+import xs.utils.debug.HAssert
 
 class MSHRTasks(implicit p: Parameters) extends TL2CHIL2Bundle {
   // outer
@@ -83,7 +87,7 @@ class MSHR(implicit p: Parameters) extends TL2CHIL2Module with HasCHIOpcodes {
 
   val req_released_chiOpcode = RegInit(0.U.asTypeOf(UInt(OPCODE_WIDTH.W)))
 
-  assert(!(req_valid && dirResult.hit && !isT(meta.state) && meta.dirty),
+  HAssert(!(req_valid && dirResult.hit && !isT(meta.state) && meta.dirty),
     "directory valid read with dirty under non-T state")
 
   /**
@@ -238,9 +242,9 @@ class MSHR(implicit p: Parameters) extends TL2CHIL2Module with HasCHIOpcodes {
   //          the 'retToSrc' of SnpUniqueStash must be bound to 0, and whether responding
   //          SnpRespData or SnpResp was not determined by 'retToSrc'.
   //          the 'retToSrc' of SnpQuery must be bound to 0
-  assert(!(req_valid && req_chiOpcode === SnpUniqueStash && req.retToSrc.get),
+  HAssert(!(req_valid && req_chiOpcode === SnpUniqueStash && req.retToSrc.get),
     "specification failure: received SnpUniqueStash with RetToSrc = 1")
-  assert(!(req_valid && isSnpQuery(req_chiOpcode) && req.retToSrc.get),
+  HAssert(!(req_valid && isSnpQuery(req_chiOpcode) && req.retToSrc.get),
     "specification failure: received SnpQuery with RetToSrc = 1")
 
   /**
@@ -257,7 +261,7 @@ class MSHR(implicit p: Parameters) extends TL2CHIL2Module with HasCHIOpcodes {
   // under above circumstances, we grant T to L1 even if it wants B
   val req_promoteT = (req_acquire || req_get || req_prefetch) && (promoteT_normal || promoteT_L3 || promoteT_alias)
 
-  assert(!(req_valid && req_prefetch && dirResult.hit), "MSHR can not receive prefetch hit req")
+  HAssert(!(req_valid && req_prefetch && dirResult.hit), "MSHR can not receive prefetch hit req")
 
   /* ======== Task allocation ======== */
   // The first Release with AllowRetry = 1 is sent to main pipe, because the task needs to write DS.
@@ -294,7 +298,7 @@ class MSHR(implicit p: Parameters) extends TL2CHIL2Module with HasCHIOpcodes {
     mp_cmometaw_valid
   // io.tasks.prefetchTrain.foreach(t => t.valid := !state.s_triggerprefetch.getOrElse(true.B))
 
-  assert(state.s_refill || state.s_cmoresp, "refill not allowed on CMO operation")
+  HAssert(state.s_refill || state.s_cmoresp, "refill not allowed on CMO operation")
 
   when (
     pending_grant_valid &&
@@ -995,7 +999,7 @@ class MSHR(implicit p: Parameters) extends TL2CHIL2Module with HasCHIOpcodes {
     ("NonCopyBackWrData", CHICohStateTransSet.ofNonCopyBackWrData(NonCopyBackWrData)),
     ("WriteDataCancel", CHICohStateTransSet.ofWriteDataCancel(WriteDataCancel))
   ).foreach { case (name, set) => {
-    assert(!mp_valid || CHICohStateTransSet.isValid(set, 
+    HAssert(!mp_valid || CHICohStateTransSet.isValid(set, 
         mp.txChannel, mp.chiOpcode.get, mp.resp.get),
       s"invalid Resp for ${name}")
   }}
@@ -1005,7 +1009,7 @@ class MSHR(implicit p: Parameters) extends TL2CHIL2Module with HasCHIOpcodes {
       ("DataSepResp", CHICohStateTransSet.ofDataSepResp(DataSepResp)),
       ("RespSepData", CHICohStateTransSet.ofRespSepData(RespSepData))
     ).foreach { case (name, set) => {
-      assert(!mp_valid || CHICohStateTransSet.isValid(set, 
+      HAssert(!mp_valid || CHICohStateTransSet.isValid(set, 
           mp.txChannel, mp.chiOpcode.get, mp.resp.get),
         s"invalid Resp for ${name}")
     }}
@@ -1016,7 +1020,7 @@ class MSHR(implicit p: Parameters) extends TL2CHIL2Module with HasCHIOpcodes {
     ("SnpRespFwded", CHICohStateFwdedTransSet.ofSnpRespFwded(SnpRespFwded)),
     ("SnpRespDataFwded", CHICohStateFwdedTransSet.ofSnpRespDataFwded(SnpRespDataFwded))
   ).foreach { case (name, set) => {
-    assert(!mp_valid || CHICohStateFwdedTransSet.isValid(set, 
+    HAssert(!mp_valid || CHICohStateFwdedTransSet.isValid(set, 
         mp.txChannel, mp.chiOpcode.get, mp.resp.get, mp.fwdState.get),
       s"invalid combination of Resp and FwdState for ${name}")
   }}
@@ -1038,7 +1042,7 @@ class MSHR(implicit p: Parameters) extends TL2CHIL2Module with HasCHIOpcodes {
     when (wcompack_valid) {
       state.s_wcompack.get := true.B
     }
-    assert(!(rcompack_valid && wcompack_valid))
+    HAssert(!(rcompack_valid && wcompack_valid))
   }
   when (io.tasks.source_b.fire) {
     state.s_pprobe := true.B
@@ -1347,8 +1351,8 @@ class MSHR(implicit p: Parameters) extends TL2CHIL2Module with HasCHIOpcodes {
   io.msInfo.bits.releaseToClean := releaseToClean
   io.msInfo.bits.channel := req.channel
 
-  assert(!(c_resp.valid && !io.status.bits.w_c_resp))
-  assert(!(rxrsp.valid && rxrsp.bits.chiOpcode.get =/= PCrdGrant && !io.status.bits.w_d_resp))
+  HAssert(!(c_resp.valid && !io.status.bits.w_c_resp))
+  HAssert(!(rxrsp.valid && rxrsp.bits.chiOpcode.get =/= PCrdGrant && !io.status.bits.w_d_resp))
 
   /* ======== Handling Nested C ======== */
   // for A miss, only when replResp do we finally choose a way, allowing nested C
@@ -1403,21 +1407,15 @@ class MSHR(implicit p: Parameters) extends TL2CHIL2Module with HasCHIOpcodes {
 
   dontTouch(state)
 
-  // 
-  // deadlock check
-  // 
-  val validCnt = RegInit(0.U(64.W))
-  when (io.alloc.valid) {
-    validCnt := 0.U
+  val mshrAddr = Cat(req.tag, req.set, 0.U(6.W))
+  val mshrAddrVec = Wire(Vec(math.pow(2, bankBits).toInt, UInt(addressBits.W)))
+  var mshrAddrSeq = cf""
+  mshrAddrVec.zipWithIndex.foreach { case(addr, i) =>
+    addr := restoreAddress(mshrAddr, i)
+    mshrAddrSeq = mshrAddrSeq + cf" addr_bank$i => 0x$addr%x "
   }
-
-  when (req_valid) {
-    validCnt := validCnt + 1.U
-  }
-
-  val mshrAddr = Cat(req.tag, req.set, 0.U(6.W)) // TODO: consider multibank
-  val VALID_CNT_MAX = 400000.U
-  assert(validCnt <= VALID_CNT_MAX, "validCnt full!, maybe there is a deadlock! addr => 0x%x req_opcode => %d channel => 0b%b", mshrAddr, req.opcode, req.channel)
+  dontTouch(mshrAddrVec) // for debug
+  HAssert.checkTimeout(!req_valid, 60000, cf"MSHR Timeout!, maybe there is a deadlock!" + mshrAddrSeq + cf"req_opcode => ${req.opcode} channel => 0b${req.channel}")
 
   val evictFire = io.tasks.txreq.fire && io.tasks.txreq.bits.opcode === Evict ||
     io.tasks.mainpipe.fire && io.tasks.mainpipe.bits.opcode === Evict && io.tasks.mainpipe.bits.toTXREQ
@@ -1427,10 +1425,10 @@ class MSHR(implicit p: Parameters) extends TL2CHIL2Module with HasCHIOpcodes {
     io.tasks.mainpipe.fire && io.tasks.mainpipe.bits.opcode === WriteCleanFull && io.tasks.mainpipe.bits.toTXREQ
   val weFire = io.tasks.txreq.fire && io.tasks.txreq.bits.opcode === WriteEvictFull ||
     io.tasks.mainpipe.fire && io.tasks.mainpipe.bits.opcode === WriteEvictFull && io.tasks.mainpipe.bits.toTXREQ
-  assert(!RegNext(evictFire) || state.s_cbwrdata.get, "There should be no CopyBackWrData after Evict")
-  assert(!RegNext(wbFire) || !state.s_cbwrdata.get, "There must be a CopyBackWrData after WriteBack")
-  assert(!RegNext(wcFire) || !state.s_cbwrdata.get, "There must be a CopyBackWrData after WriteClean")
-  assert(!RegNext(weFire) || !state.s_cbwrdata.get, "There must be a CopyBackWrData after WriteEvictFull")
+  HAssert(!RegNext(evictFire) || state.s_cbwrdata.get, "There should be no CopyBackWrData after Evict")
+  HAssert(!RegNext(wbFire) || !state.s_cbwrdata.get, "There must be a CopyBackWrData after WriteBack")
+  HAssert(!RegNext(wcFire) || !state.s_cbwrdata.get, "There must be a CopyBackWrData after WriteClean")
+  HAssert(!RegNext(weFire) || !state.s_cbwrdata.get, "There must be a CopyBackWrData after WriteEvictFull")
 
   /* ======== Performance counters ======== */
   // time stamp
