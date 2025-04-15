@@ -19,11 +19,12 @@ package coupledL2.tl2chi
 
 import chisel3._
 import chisel3.util._
-import utility._
 import org.chipsalliance.cde.config.Parameters
-import scala.collection.View.Fill
-import coupledL2.{TaskBundle, MSHRInfo, MetaEntry, MergeTaskBundle}
-import coupledL2.MetaData._
+import coupledL2.{MSHRInfo, MergeTaskBundle, MetaEntry, TaskBundle}
+import xs.utils.cache.MetaData._
+import xs.utils.ParallelOR
+import xs.utils.tl.MemReqSource
+import xs.utils.debug.HAssert
 
 class RXSNP(
   lCreditNum: Int = 4 // the number of L-Credits that a receiver can provide
@@ -109,7 +110,7 @@ class RXSNP(
     Mux(hit, ms.bits.meta, MetaEntry())
   }})
 
-  assert(!rxsnp.valid || PopCount(replaceNestSnpMask) <= 1.U, "multiple replace nest snoop")
+  HAssert(!rxsnp.valid || PopCount(replaceNestSnpMask) <= 1.U, "multiple replace nest snoop")
 
   task := fromSnpToTaskBundle(rxsnp.bits)
 
@@ -126,11 +127,10 @@ class RXSNP(
   }
 
   val STALL_CNT_MAX = 28000.U
-  assert(stallCnt <= STALL_CNT_MAX,
-    "stallCnt full! maybe there is a deadlock! addr => 0x%x req_opcode => %d txn_id => %d",
-    rxsnp.bits.addr, rxsnp.bits.opcode, rxsnp.bits.txnID)
+  HAssert(stallCnt <= STALL_CNT_MAX,
+    "stallCnt full! maybe there is a deadlock! addr => 0x${rxsnp.bits.addr} req_opcode => 0x${rxsnp.bits.opcode} txn_id => 0x${rxsnp.bits.txnID}")
 
-  assert(!(stall && rxsnp.fire))
+  HAssert(!(stall && rxsnp.fire))
 
   def fromSnpToTaskBundle(snp: CHISNP): TaskBundle = {
     val task = WireInit(0.U.asTypeOf(new TaskBundle))
@@ -186,4 +186,5 @@ class RXSNP(
     task
   }
 
+  HAssert.placePipe(2)
 }

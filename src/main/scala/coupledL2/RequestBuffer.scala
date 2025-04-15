@@ -22,10 +22,9 @@ import freechips.rocketchip.tilelink.TLMessages._
 import freechips.rocketchip.tilelink.TLPermissions._
 import chisel3._
 import chisel3.util._
-import coupledL2._
-import coupledL2.utils._
-import utility._
-
+import xs.utils.FastArbiter
+import xs.utils.perf.{XSPerfAccumulate, XSPerfHistogram, XSPerfMax}
+import xs.utils.debug.HAssert
 class ReqEntry(entries: Int = 4)(implicit p: Parameters) extends L2Bundle() {
   val valid    = Bool()
   val rdy      = Bool()
@@ -213,7 +212,7 @@ class RequestBuffer(flow: Boolean = true, entries: Int = 4)(implicit p: Paramete
     entry.waitMS  := conflictMask(in)
 
 //    entry.depMask := depMask
-    assert(PopCount(conflictMaskFromA(in)) <= 2.U)
+    HAssert(PopCount(conflictMaskFromA(in)) <= 2.U)
   }
 
   /* ======== Issue ======== */
@@ -326,4 +325,5 @@ class RequestBuffer(flow: Boolean = true, entries: Int = 4)(implicit p: Paramete
         // assert !(all entries occupied for 100 cycles)
     }
   }
+  HAssert.placePipe(2)
 }

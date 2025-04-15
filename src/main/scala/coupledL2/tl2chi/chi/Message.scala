@@ -22,10 +22,10 @@ import chisel3.util._
 import org.chipsalliance.cde.config.Parameters
 import org.chipsalliance.cde.config.Field
 import scala.math.max
-import coupledL2.{L2ParamKey, TaskBundle}
 import coupledL2.tl2chi.CHICohStates._
 import coupledL2.tl2chi.CHICohStateTrans._
 import coupledL2.tl2chi.CHICohStateFwdedTrans._
+import xs.utils.cache.common.L2ParamKey
 
 case object CHIIssue extends Field[String](Issue.B)
 

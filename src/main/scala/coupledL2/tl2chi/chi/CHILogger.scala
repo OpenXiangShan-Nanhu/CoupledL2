@@ -22,7 +22,7 @@ import org.chipsalliance.cde.config.Parameters
 import freechips.rocketchip.diplomacy._
 import freechips.rocketchip.util._
 import scala.collection.immutable.{ListMap, SeqMap}
-import utility.ChiselDB
+import xs.utils.ChiselDB
 
 class CHILogger(name: String, enable: Boolean)
                (implicit val p: Parameters) extends Module with HasCHIOpcodes {

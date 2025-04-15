@@ -27,7 +27,7 @@ import coupledL2._
 import coupledL2.utils._
 import coupledL2.debug._
 import coupledL2.prefetch.PrefetchIO
-import utility.{RegNextN, XSPerfHistogram}
+import xs.utils.perf.XSPerfHistogram
 
 class OuterBundle(params: TLBundleParameters) extends TLBundle(params) with BaseOuterBundle
 

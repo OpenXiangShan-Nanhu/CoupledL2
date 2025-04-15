@@ -24,7 +24,7 @@ import freechips.rocketchip.tilelink._
 import freechips.rocketchip.tilelink.TLMessages._
 import freechips.rocketchip.tilelink.TLPermissions._
 import coupledL2._
-import utility.MemReqSource
+import xs.utils.tl.MemReqSource
 
 class SinkB(implicit p: Parameters) extends L2Module {
   val io = IO(new Bundle() {

@@ -20,8 +20,8 @@ package coupledL2.tl2chi
 import chisel3._
 import chisel3.util._
 import org.chipsalliance.cde.config.Parameters
-import utility._
 import coupledL2.L2Module
+import xs.utils.perf.{XSPerfHistogram, QueuePerf, XSPerfAccumulate}
 
 class ChannelIO[+T <: Data](gen: T) extends Bundle {
   // Flit Pending. Early indication that a flit might be transmitted in the following cycle

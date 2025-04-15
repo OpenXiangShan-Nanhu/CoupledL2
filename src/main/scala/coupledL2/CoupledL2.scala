@@ -21,19 +21,27 @@ package coupledL2
 
 import chisel3._
 import chisel3.util._
-import utility._
-import freechips.rocketchip.diplomacy._
+import xs.utils.{DFTResetSignals, FastArbiter, ParallelPriorityMux, Pipeline, RegNextN}
+import xs.utils.perf.{HasPerfEvents, XSPerfAccumulate}
+import org.chipsalliance.diplomacy.lazymodule._
+import org.chipsalliance.diplomacy.bundlebridge.{BundleBridgeSink, BundleBridgeSource}
 import freechips.rocketchip.tile.MaxHartIdBits
 import freechips.rocketchip.tilelink._
 import freechips.rocketchip.tilelink.TLMessages._
 import freechips.rocketchip.util._
-import org.chipsalliance.cde.config.{Field, Parameters}
+import org.chipsalliance.cde.config.Parameters
 
-import scala.math.max
 import coupledL2.prefetch._
-import huancun.{BankBitsKey, TPmetaReq, TPmetaResp}
-import utility.mbist.{MbistInterface, MbistPipeline}
-import utility.sram.{SramBroadcastBundle, SramHelper}
+import freechips.rocketchip.diplomacy.{IdRange, RegionType, TransferSizes}
+import xs.utils.cache.common.{PrefetchRecv, TPmetaReq, TPmetaResp}
+import xs.utils.mbist.{MbistInterface, MbistPipeline}
+import xs.utils.sram.{SramBroadcastBundle, SramHelper}
+import xs.utils.cache.prefetch.{BOPParameters, TPmetaParameters, TPParameters}
+import xs.utils.cache.{MetaData, EnableCHI}
+import xs.utils.cache.common._
+import xs.utils.mbist._
+import xs.utils.sram._
+import xs.utils._
 
 trait HasCoupledL2Parameters {
   val p: Parameters
@@ -333,12 +341,14 @@ abstract class CoupledL2Base(implicit p: Parameters) extends LazyModule with Has
       val error = Output(new L2CacheErrorInfo()(l2ECCParams))
       val l2Flush = Option.when(cacheParams.enableL2Flush) (Input(Bool()))
       val l2FlushDone = Option.when(cacheParams.enableL2Flush) (Output(Bool()))
-      val dft = Option.when(cacheParams.hasDFT)(Input(new SramBroadcastBundle))
-      val dft_reset = Option.when(cacheParams.hasMbist)(Input(new DFTResetSignals()))
+      val dft = new Bundle() {
+        val func      = Option.when(cacheParams.hasMbist)(Input(new SramBroadcastBundle))
+        val reset     = Option.when(cacheParams.hasMbist)(Input(new DFTResetSignals()))
+      }
     })
 
     // Display info
-    val sizeBytes = cacheParams.toCacheParams.capacity.toDouble
+    val sizeBytes = cacheParams.capacity.toDouble
     val sizeStr = sizeBytesToStr(sizeBytes)
     println(s"====== Inclusive TL-${if (enableCHI) "CHI" else "TL"} ${cacheParams.name} ($sizeStr * $banks-bank)  ======")
     println(s"prefetch: ${cacheParams.prefetch}")
@@ -611,29 +621,16 @@ abstract class CoupledL2Base(implicit p: Parameters) extends LazyModule with Has
     val okHint = grant_data_fire.orR && hintPipe1.io.out.valid && hintPipe1.io.out.bits === grant_data_source
     XSPerfAccumulate("ok2Hints", okHint)
 
-    private val sigFromSrams = Option.when(cacheParams.hasDFT)(SramHelper.genBroadCastBundleTop())
-    private val cg = Option.when(cacheParams.hasMbist)(utility.ClockGate.genTeSrc)
+    private val sigFromSrams = Option.when(cacheParams.hasMbist)(SramHelper.genBroadCastBundleTop())
+    private val cg = Option.when(cacheParams.hasMbist)(xs.utils.ClockGate.getTop)
+    sigFromSrams.foreach({ case sig => sig := DontCare })
     if (cacheParams.hasMbist) {
-      cg.get.cgen := io.dft.get.cgen
-    }
-    sigFromSrams.foreach { sig => sig := DontCare }
-    sigFromSrams.zip(io.dft).foreach {
-      case (sig, dft) =>
-        if (cacheParams.hasMbist) {
-          sig.ram_hold := dft.ram_hold
-          sig.ram_bypass := dft.ram_bypass
-          sig.ram_bp_clken := dft.ram_bp_clken
-          sig.ram_aux_clk := dft.ram_aux_clk
-          sig.ram_aux_ckbp := dft.ram_aux_ckbp
-          sig.ram_mcp_hold := dft.ram_mcp_hold
-          sig.cgen := dft.cgen
-        }
-        if (cacheParams.hasSramCtl) {
-          sig.ram_ctl := dft.ram_ctl
-        }
+      cg.get.te := io.dft.func.get.cgen
+      sigFromSrams.get := io.dft.func.get
     }
 
-    private val mbistPl = MbistPipeline.PlaceMbistPipeline(Int.MaxValue, "L2Cache", cacheParams.hasMbist)
+    private val mbistPl = MbistPipeline.PlaceMbistPipeline(Int.MaxValue, "MbistPipeL2Cache", cacheParams.hasMbist)
+
     private val l2MbistIntf = if (cacheParams.hasMbist) {
       val params = mbistPl.get.nodeParams
       val intf = Some(Module(new MbistInterface(

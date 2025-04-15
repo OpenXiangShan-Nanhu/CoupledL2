@@ -19,8 +19,6 @@ package coupledL2.tl2tl
 
 import chisel3._
 import chisel3.util._
-import utility._
-import coupledL2.MetaData._
 import org.chipsalliance.cde.config.Parameters
 import freechips.rocketchip.tilelink._
 import freechips.rocketchip.tilelink.TLMessages._
@@ -28,7 +26,11 @@ import freechips.rocketchip.tilelink.TLPermissions._
 import coupledL2._
 import coupledL2.utils._
 import coupledL2.debug._
-import coupledL2.prefetch.{PfSource, PrefetchTrain}
+import xs.utils.cache.prefetch.{PfSource}
+import coupledL2.prefetch.PrefetchTrain
+import xs.utils.cache.MetaData._
+import xs.utils.{ParallelMux, ParallelPriorityMux, RegNextN}
+import xs.utils.perf.{HasPerfEvents, XSPerfAccumulate, XSPerfHistogram}
 
 class MainPipe(implicit p: Parameters) extends L2Module with HasPerfEvents {
   val io = IO(new Bundle() {
