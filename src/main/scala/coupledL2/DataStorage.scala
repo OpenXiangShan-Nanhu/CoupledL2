@@ -24,7 +24,7 @@ import xs.utils.mbist.MbistPipeline
 import coupledL2.utils.SplittedSRAM
 import xs.utils.debug.HAssert
 import xs.utils.cache.common.L2ParamKey
-import xs.utils.sram.SRAMTemplate
+import xs.utils.sram.{SRAMTemplate, SramBroadcastBundle}
 import xs.utils.ClockGate
 
 class DSRequest(implicit p: Parameters) extends L2Bundle {
@@ -40,6 +40,26 @@ class DSBeat(implicit p: Parameters) extends L2Bundle {
 
 class DSBlock(implicit p: Parameters) extends L2Bundle {
   val data = UInt(blockBits.W)
+  def := (that: DSECCBankBlock):Unit = {
+    if(enableDataECC) {
+      val eccDatVec = that.data.asTypeOf(Vec(dataBankSplit, UInt(encBankBits.W)))
+      val datVec = eccDatVec.map(_(dataBankBits - 1, 0))
+      this.data := Cat(datVec.reverse)
+    } else {
+      this.data := that.data
+    }
+  }
+  def mergeEccPart(ecc:Vec[UInt]): DSECCBankBlock = {
+    val res = Wire(new DSECCBankBlock)
+    if(enableDataECC) {
+      val datVec = this.data.asTypeOf(Vec(dataBankSplit, UInt(dataBankBits.W)))
+      val eccDatVec = VecInit(ecc.zip(datVec).map(e => Cat(e._1, e._2)))
+      res.data := eccDatVec.asUInt
+    } else {
+      res.data := this.data
+    }
+    res
+  }
 }
 
 class DSECCBankBlock(implicit p: Parameters) extends L2Bundle {
@@ -47,6 +67,14 @@ class DSECCBankBlock(implicit p: Parameters) extends L2Bundle {
     UInt((encBankBits * dataBankSplit).W)
   } else {
     UInt((dataBankBits * dataBankSplit).W)
+  }
+  def eccPart(): Vec[UInt] = {
+    if (enableDataECC) {
+      val eccDatVec = data.asTypeOf(Vec(dataBankSplit, UInt(encBankBits.W)))
+      VecInit(eccDatVec.map(_(encBankBits - 1, dataBankBits)))
+    } else {
+      VecInit(Seq.fill(dataBankSplit)(0.U(0.W)))
+    }
   }
 }
 
@@ -65,7 +93,7 @@ class DataStorage(implicit p: Parameters) extends L2Module {
     // 2. according to the requirement of MCP2, [req.valid, req.bits, wdata]
     // must hold for 2 cycles (unchanged at en and RegNext(en))
     val req = Flipped(ValidIO(new DSRequest))
-    val rdata = Output(new DSBlock)
+    val rdata = Output(new DSECCBankBlock)
     val wdata = Input(new DSBlock)
   })
 
@@ -77,11 +105,10 @@ class DataStorage(implicit p: Parameters) extends L2Module {
     singlePort = true,
     latency = 2,
     hasMbist = p(L2ParamKey).hasMbist,
+    pipeDepth = 1,
     extraHold = true,
     suffix = "_l2c_dat"
   ))
-
-  private val mbistPl = MbistPipeline.PlaceMbistPipeline(1, "MbistPipeL2DataStorage", p(L2ParamKey).hasMbist)
 
   val arrayIdx = Cat(io.req.bits.way, io.req.bits.set)
   val wen = io.req.valid && io.req.bits.wen
@@ -90,20 +117,13 @@ class DataStorage(implicit p: Parameters) extends L2Module {
   val arrayWrite = Wire(new DSECCBankBlock)
   val arrayWriteData = if (enableDataECC) {
     Cat(VecInit(Seq.tabulate(dataBankSplit)(i =>
-      io.wdata.data(dataBankBits * (i + 1) - 1, dataBankBits * i))).map(data => cacheParams.dataCode.encode(data)))
+      io.wdata.data(dataBankBits * (i + 1) - 1, dataBankBits * i))).map(data => cacheParams.dataCode.encode(data)).reverse)
   } else {
     io.wdata.data
   }
   arrayWrite.data := arrayWriteData
 
   val arrayRead = array.io.r.resp.data(0)
-  val dataRead = Wire(new DSBlock)
-  val bankDataRead = if (enableDataECC) {
-    Cat(VecInit(Seq.tabulate(dataBankSplit)(i => arrayRead.data(encBankBits * (i + 1) - 1, encBankBits * i)(dataBankBits - 1, 0))))
-  } else {
-    arrayRead.data
-  }
-  dataRead.data := bankDataRead
 
   // make sure SRAM input signals will not change during the two cycles
   // TODO: This check is done elsewhere
@@ -120,7 +140,7 @@ class DataStorage(implicit p: Parameters) extends L2Module {
 
   // for timing, we set this as multicycle path
   // s3 read, s4 pass and s5 to destination
-  io.rdata := dataRead
+  io.rdata := arrayRead
   io.error := error
 
   HAssert(!io.en || !RegNext(io.en, false.B),

@@ -345,6 +345,7 @@ abstract class CoupledL2Base(implicit p: Parameters) extends LazyModule with Has
         val func      = Option.when(cacheParams.hasMbist)(Input(new SramBroadcastBundle))
         val reset     = Option.when(cacheParams.hasMbist)(Input(new DFTResetSignals()))
       }
+      val ramctl = Input(new SramCtrlBundle)
     })
 
     // Display info
@@ -629,24 +630,8 @@ abstract class CoupledL2Base(implicit p: Parameters) extends LazyModule with Has
       sigFromSrams.get := io.dft.func.get
     }
 
-    private val mbistPl = MbistPipeline.PlaceMbistPipeline(Int.MaxValue, "MbistPipeL2Cache", cacheParams.hasMbist)
-
-    private val l2MbistIntf = if (cacheParams.hasMbist) {
-      val params = mbistPl.get.nodeParams
-      val intf = Some(Module(new MbistInterface(
-        params = Seq(params),
-        ids = Seq(mbistPl.get.childrenIds),
-        name = s"MbistIntfL2",
-        pipelineNum = 1
-      )))
-      intf.get.toPipeline.head <> mbistPl.get.mbist
-      if (cacheParams.hartId == 0) mbistPl.get.registerCSV(intf.get.info, "MbistL2")
-      intf.get.mbist := DontCare
-      dontTouch(intf.get.mbist)
-      //TODO: add mbist controller connections here
-      intf
-    } else {
-      None
-    }
+    val sramBroadcastBundleInst = io.dft.func.getOrElse(new SramBroadcastBundle())
+    MbistInterface("L2Cache", sramBroadcastBundleInst, cacheParams.hasMbist)
+    SramHelper.genSramCtrlBundleTop() := io.ramctl
   }
 }
