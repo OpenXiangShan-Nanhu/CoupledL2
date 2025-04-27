@@ -6,8 +6,14 @@ compile:
 	mill -i CoupledL2.compile
 	mill -i CoupledL2.test.compile
 
+RTL_DIR = build/rtl
+MKDIR_CMD = mkdir -p $(RTL_DIR)
+ifeq ($(OS),Windows_NT)
+MKDIR_CMD = powershell 'New-Item -Force -Path $(RTL_DIR) -ItemType Directory | Out-Null'
+endif
+
 verilog:
-	mkdir -p build
+	@$(MKDIR_CMD)
 	mill -i CoupledL2.test.runMain top.TopMain --split-verilog --target systemverilog --full-stacktrace -td build/rtl
 
 clean:

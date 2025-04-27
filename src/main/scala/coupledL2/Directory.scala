@@ -141,6 +141,7 @@ class Directory(implicit p: Parameters) extends L2Module {
   val tagWen  = io.tagWReq.valid
   val metaWen = io.metaWReq.valid
   val replacerWen = WireInit(false.B)
+  private val mbistAck = WireInit(false.B)
 
   // val tagArray  = Module(new SRAMTemplate(UInt(tagBits.W), sets, ways, singlePort = true))
   private val mbist = p(L2ParamKey).hasMbist
@@ -235,9 +236,9 @@ class Directory(implicit p: Parameters) extends L2Module {
     io.metaWReq.bits.wayOH
   )
 
-  val metaAll_s3 = RegEnable(metaRead, 0.U.asTypeOf(metaRead), reqValid_s2)
-  val tagAll_s3 = RegEnable(tagRead_s3, 0.U.asTypeOf(tagRead_s3), reqValid_s2)
-  val errorAll_s3 = RegEnable(errorRead, 0.U.asTypeOf(errorRead), reqValid_s2)
+  val metaAll_s3 = RegEnable(metaRead, 0.U.asTypeOf(metaRead), reqValid_s2 | mbistAck)
+  val tagAll_s3 = RegEnable(tagRead_s3, 0.U.asTypeOf(tagRead_s3), reqValid_s2 | mbistAck)
+  val errorAll_s3 = RegEnable(errorRead, 0.U.asTypeOf(errorRead), reqValid_s2 | mbistAck)
 
   val tagMatchVec = tagAll_s3.map(_ (tagBits - 1, 0) === req_s3.tag)
   val metaValidVec = metaAll_s3.map(_.state =/= MetaData.INVALID)
@@ -313,7 +314,7 @@ class Directory(implicit p: Parameters) extends L2Module {
     0.U
   } else {
     val repl_sram_r = replacer_sram_opt.get.io.r(io.read.fire, io.read.bits.set).resp.data(0)
-    val repl_state = RegEnable(repl_sram_r, 0.U(repl.nBits.W), reqValid_s2)
+    val repl_state = RegEnable(repl_sram_r, 0.U(repl.nBits.W), reqValid_s2 | mbistAck)
     repl_state
   }
 
@@ -346,9 +347,10 @@ class Directory(implicit p: Parameters) extends L2Module {
   // origin-bit marks whether the data_block is reused
   val origin_bit_opt = if(random_repl) None else
     Some(Module(new SRAMTemplate(Bool(), sets, ways, singlePort = true, shouldReset = true, hasMbist = mbist , suffix = "_l2c_ori")))
-  val origin_bits_r = origin_bit_opt.get.io.r(io.read.fire, io.read.bits.set).resp.data
-  val origin_bits_hold = Wire(Vec(ways, Bool()))
-  origin_bits_hold := HoldUnless(origin_bits_r, RegNext(io.read.fire, false.B))
+  val origin_bits_r = origin_bit_opt.map(_.io.r(io.read.fire, io.read.bits.set).resp.data).getOrElse(VecInit(Seq.fill(ways)(false.B)))
+  val origin_bits_rvld = RegNext(io.read.fire | mbistAck, false.B)
+  val origin_bits_reg = RegEnable(origin_bits_r, origin_bits_rvld)
+  val origin_bits_hold = Mux(origin_bits_rvld, origin_bits_r, origin_bits_reg)
   origin_bit_opt.get.io.w(
       !resetFinish || replacerWen,
       Mux(resetFinish, hit_s3, false.B),
@@ -366,6 +368,31 @@ class Directory(implicit p: Parameters) extends L2Module {
     req_s3.refill
   )
   private val mbistPl = MbistPipeline.PlaceMbistPipeline(1, "MbistPipeL2Directory", mbist)
+  mbistAck := mbistPl.map(_.mbist.mbist_ack).getOrElse(false.B)
+  if(mbist) {
+    val mbistBankTagReadHigh = if (enableTagECC) {
+      VecInit(tagRead.map(x =>
+        Cat(VecInit(Seq.tabulate(tagBankSplit)(i => x(encTagBankBits * (i + 1) - 1, encTagBankBits * i)(x.getWidth - 1, tagBankBits))))
+      ))
+    } else {
+      VecInit(Seq.fill(ways)(0.U))
+    }
+    val mbistBankTagReadHighReg = RegEnable(mbistBankTagReadHigh,  0.U.asTypeOf(mbistBankTagReadHigh), mbistAck)
+    val combinedElements = Cat(mbistBankTagReadHighReg.zip(tagAll_s3).map { case (a, b) => Cat(a, b)}.reverse)
+    val ramSeq = Seq(
+      tagArray -> combinedElements.asUInt,
+      metaArray -> metaAll_s3.asUInt
+    ) ++
+      replacer_sram_opt.map(r => r -> repl_state_s3.asUInt) ++
+      origin_bit_opt.map(o => o -> origin_bits_reg.asUInt)
+    val idToDat = ramSeq.map(elm => (elm._1.sp.mbistArrayIds.max, elm._2.asUInt)).toMap
+    for(rp <- mbistPl.get.toSRAM) {
+      val selOhReg = RegEnable(rp.selectedOH, rp.ack)
+      val dat = idToDat(rp.params.maxArrayId)
+      val dv = dat.asTypeOf(Vec(selOhReg.getWidth, UInt((dat.getWidth / selOhReg.getWidth).W)))
+      rp.rdata := Mux1H(selOhReg, dv)
+    }
+  }
   if(cacheParams.replacement == "srrip"){
     val next_state_s3 = repl.get_next_state(repl_state_s3, way_s3, hit_s3, inv, rrip_req_type)
     val repl_init = Wire(Vec(ways, UInt(2.W)))

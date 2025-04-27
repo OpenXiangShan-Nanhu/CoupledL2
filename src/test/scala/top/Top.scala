@@ -14,12 +14,13 @@ import org.chipsalliance.diplomacy.DisableMonitors
 import org.chipsalliance.cde.config.{Config, Parameters}
 import xs.utils.cache.common.{AliasField, BankBitsKey, L2ParamKey, PrefetchField, VaddrField}
 import coupledL2.prefetch.PrefetchReceiverParams
-import xs.utils.FileRegisters
+import xs.utils.{DFTResetSignals, FileRegisters}
 import xs.utils.cache.{EnableCHI, L1Param, L2Param}
 import xs.utils.debug.{HardwareAssertion, HardwareAssertionKey, HwaParams}
 import xs.utils.perf.{LogUtilsOptions, LogUtilsOptionsKey, PerfCounterOptions, PerfCounterOptionsKey, XSPerfLevel}
 import xs.utils.stage.XsStage
 import xs.utils.cache.prefetch.BOPParameters
+import xs.utils.sram.{SramBroadcastBundle, SramCtrlBundle}
 
 class Top(implicit p: Parameters) extends LazyModule {
   override lazy val desiredName: String = "TestTop"
@@ -73,13 +74,18 @@ class Top(implicit p: Parameters) extends LazyModule {
 
 
   lazy val module = new Impl
+
   class Impl extends LazyModuleImp(this) {
+    override def resetType: Module.ResetType.Type = Module.ResetType.Asynchronous
     val l1d = l1dNode.makeIOs()
     val l1i = l1iNode.makeIOs()
     val mmio = mmioNode.makeIOs()
     val chi = IO(l2cache.module.io_chi.cloneType)
     val prefetch = prefetchSourceNode.map(_.makeIOs())
     val tlb = IO(l2cache.module.io.l2_tlb_req.cloneType)
+    val dft_func = IO(Input(new SramBroadcastBundle))
+    val dft_reset = IO(Input(new DFTResetSignals()))
+    val ram_ctl = IO(Input(new SramCtrlBundle))
 
     l2cache.module.io.l2_tlb_req <> tlb
     l2cache.module.io_chi <> chi
@@ -88,6 +94,11 @@ class Top(implicit p: Parameters) extends LazyModule {
     l2cache.module.io_nodeID := 0.U
     l2cache.module.io.debugTopDown := DontCare
     l2cache.module.io.l2_tlb_req <> DontCare
+    if (l2cache.module.io.dft.func.isDefined) {
+      l2cache.module.io.dft.func.get := dft_func
+      l2cache.module.io.dft.reset.get := dft_reset
+    }
+    l2cache.module.io.ramctl := ram_ctl
     dontTouch(l2cache.module.io)
 
     tpMetaSinkNode.foreach(_.in.head._1.ready := true.B)
@@ -97,7 +108,7 @@ class Top(implicit p: Parameters) extends LazyModule {
     HardwareAssertion.release(assertionNode, "hwa", "cpl2")
     assertionNode.foreach(_.hassert.bus.get.ready := true.B)
     val hwa = assertionNode.map(an => IO(Decoupled(UInt(p(HardwareAssertionKey).maxInfoBits.W))))
-    if(assertionNode.isDefined) {
+    if (assertionNode.isDefined) {
       hwa.get <> assertionNode.get.hassert.bus.get
       dontTouch(hwa.get)
     }
@@ -107,11 +118,18 @@ class Top(implicit p: Parameters) extends LazyModule {
 class TopConfig extends Config((up, here, site) => {
   // case L2ParamKey => L2Param(ways = 8, sets = 1024, FPGAPlatform = true, clientCaches = Seq(L1Param(sets = 128, ways = 4)))
   case L2ParamKey => L2Param(
-     ways = 8,
-     sets = 1024,
-     FPGAPlatform = true,
-     prefetch     = Seq(BOPParameters(), PrefetchReceiverParams()),
-     clientCaches = Seq(L1Param(sets = 128, ways = 4, vaddrBitsOpt = Some(48))))
+    ways = 8,
+    sets = 1024,
+    FPGAPlatform = true,
+    tagECC = Some("secded"),
+    dataECC = Some("secded"),
+    enableTagECC = true,
+    enableDataECC = true,
+    dataCheck = None,
+    prefetch = Seq(BOPParameters(), PrefetchReceiverParams()),
+    clientCaches = Seq(L1Param(sets = 128, ways = 4, vaddrBitsOpt = Some(48))),
+    hasMbist = true
+  )
   case CHIIssue => Issue.Eb
   case EnableCHI => true
   case BankBitsKey => 1
@@ -140,5 +158,5 @@ object TopMain extends App {
 
   private val top = DisableMonitors(p => LazyModule(new Top()(p)))(config)
   (new XsStage).execute(firrtlOpts, firtoolOpts :+ ChiselGeneratorAnnotation(() => top.module))
-  FileRegisters.write(fileDir= "./build", filePrefix= "")
+  FileRegisters.write(fileDir = "./build", filePrefix = "")
 }
