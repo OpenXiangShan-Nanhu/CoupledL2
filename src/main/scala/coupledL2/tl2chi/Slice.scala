@@ -19,25 +19,27 @@ package coupledL2.tl2chi
 
 import chisel3._
 import chisel3.util._
-import xs.utils.mbist.MbistPipeline
+import xs.utils.mbist.{MbistPipeline, Ram2MbistParams}
 import org.chipsalliance.cde.config.Parameters
 import coupledL2._
 import coupledL2.prefetch.PrefetchIO
 import xs.utils.debug.HAssert
 import xs.utils.cache.common.L2ParamKey
+import xs.utils.sram.SramBroadcastBundle
+import xs.utils.sram.SramHelper.genMbistBoreSink
 
 class OuterBundle(implicit p: Parameters) extends DecoupledPortIO with BaseOuterBundle
 
 class Slice()(implicit p: Parameters) extends BaseSlice[OuterBundle]
   with HasCoupledL2Parameters
   with HasCHIMsgParameters {
-
+  private val hasMbist = p(L2ParamKey).hasMbist
   val io = IO(new BaseSliceIO[OuterBundle] {
     override val out: OuterBundle = new OuterBundle
   })
   val io_pCrd = IO(Vec(mshrsAll, new PCrdQueryBundle))
   val io_msStatus = topDownOpt.map(_ => IO(Vec(mshrsAll, ValidIO(new MSHRStatus))))
-
+  val io_dft = Option.when(hasMbist)(IO(new SramBroadcastBundle))
   /* Upwards TileLink-related modules */
   val sinkA = Module(new SinkA)
   val sinkC = Module(new SinkC)
@@ -61,7 +63,8 @@ class Slice()(implicit p: Parameters) extends BaseSlice[OuterBundle]
   val mainPipe = Module(new MainPipe())
   val reqBuf = Module(new RequestBuffer())
   val mshrCtl = Module(new MSHRCtl())
-  private val mbistPl = MbistPipeline.PlaceMbistPipeline(2, "MbistPipeL2Slice", p(L2ParamKey).hasMbist)
+  dataStorage.io.dft.foreach(_ := io_dft.get)
+
   sinkC.io.msInfo := mshrCtl.io.msInfo
 
   grantBuf.io.d_task <> mainPipe.io.toSourceD
@@ -163,6 +166,38 @@ class Slice()(implicit p: Parameters) extends BaseSlice[OuterBundle]
     mpWriteReleaseBuf
   ))
 
+  private val mbp = Ram2MbistParams(
+    sramParams = dataStorage.array.sp,
+    set = blocks,
+    singlePort = true,
+    vname = dataStorage.array.sramName,
+    foundry = dataStorage.array.foundry,
+    sramInst = dataStorage.array.sramInst,
+    pipeDepth = 1,
+    holder = dataStorage.array
+  )
+  private val dsMbistBd = genMbistBoreSink(mbp, io_dft, hasMbist)
+  private val eccPartReg0 = RegEnable(dataStorage.io.rdata.eccPart(), dsMbistBd.ack)
+  private val eccPartReg1 = RegEnable(eccPartReg0, dsMbistBd.ack)
+  private val dsRamRdat = releaseBuf.io.resp.data.mergeEccPart(eccPartReg1)
+  when(dsMbistBd.ack) {
+    dataStorage.io.en := true.B
+    dataStorage.io.req.valid := dsMbistBd.we | dsMbistBd.re
+    dataStorage.io.req.bits.way := dsMbistBd.addr_rd.head(1)
+    dataStorage.io.req.bits.set := dsMbistBd.addr_rd.tail(1)
+    dataStorage.io.req.bits.wen := dsMbistBd.we
+    dataStorage.io.wdata.data := dsMbistBd.wdata
+    nestedWriteReleaseBuf.valid := false.B
+    sinkCWriteReleaseBuf.valid := false.B
+    mpWriteReleaseBuf.valid := true.B
+    mpWriteReleaseBuf.bits.id := 0.U
+    mpWriteReleaseBuf.bits.beatMask := 1.U
+    releaseBuf.io.r.valid := true.B
+    releaseBuf.io.r.bits.id := 0.U
+    dsMbistBd.rdata := dsRamRdat.data(dsMbistBd.rdata.getWidth - 1, 0)
+  }
+  private val dsMbistPl = MbistPipeline.PlaceMbistPipeline(1, "MbistPipeL2Data", hasMbist)
+
   /* Read and write refill buffer */
   refillBuf.io.r := reqArb.io.refillBufRead_s2
   refillBuf.io.w <> VecInit(Seq(rxdat.io.refillBufWrite, sinkC.io.refillBufWrite))
@@ -222,5 +257,6 @@ class Slice()(implicit p: Parameters) extends BaseSlice[OuterBundle]
   /* ===== Hardware Performance Monitor ===== */
   val perfEvents = Seq(mshrCtl, mainPipe).flatMap(_.getPerfEvents)
   generatePerfEvent()
+  private val mbistPl = MbistPipeline.PlaceMbistPipeline(2, "MbistPipeL2Slice", hasMbist)
   HAssert.placePipe(3)
 }
