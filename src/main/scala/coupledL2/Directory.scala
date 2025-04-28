@@ -376,13 +376,13 @@ class Directory(implicit p: Parameters) extends L2Module {
     ) ++
       replacer_sram_opt.map(r => r -> repl_state_s3.asUInt) ++
       origin_bit_opt.map(o => o -> origin_bits_reg.asUInt)
-    val idToDat = ramSeq.flatMap(elm => {
-      val ids = elm._1.sp.mbistArrayIds.sorted
-      val dat = elm._2.asUInt
-      val dv = dat.asTypeOf(Vec(ids.size, UInt((dat.getWidth / ids.size).W)))
-      ids.zip(dv)
-    }).toMap
-    for(rp <- mbistPl.get.toSRAM) rp.rdata := idToDat(rp.params.maxArrayId)
+    val idToDat = ramSeq.map(elm => (elm._1.sp.mbistArrayIds.max, elm._2.asUInt)).toMap
+    for(rp <- mbistPl.get.toSRAM) {
+      val selOhReg = RegEnable(rp.selectedOH, rp.ack)
+      val dat = idToDat(rp.params.maxArrayId)
+      val dv = dat.asTypeOf(Vec(selOhReg.getWidth, UInt((dat.getWidth / selOhReg.getWidth).W)))
+      rp.rdata := Mux1H(selOhReg, dv)
+    }
   }
   if(cacheParams.replacement == "srrip"){
     val next_state_s3 = repl.get_next_state(repl_state_s3, way_s3, hit_s3, inv, rrip_req_type)
