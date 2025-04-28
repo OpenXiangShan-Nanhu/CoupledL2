@@ -94,8 +94,10 @@ class Top(implicit p: Parameters) extends LazyModule {
     l2cache.module.io_nodeID := 0.U
     l2cache.module.io.debugTopDown := DontCare
     l2cache.module.io.l2_tlb_req <> DontCare
-    l2cache.module.io.dft.func := dft_func
-    l2cache.module.io.dft.reset := dft_reset
+    if (l2cache.module.io.dft.func.isDefined) {
+      l2cache.module.io.dft.func.get := dft_func
+      l2cache.module.io.dft.reset.get := dft_reset
+    }
     l2cache.module.io.ramctl := ram_ctl
     dontTouch(l2cache.module.io)
 

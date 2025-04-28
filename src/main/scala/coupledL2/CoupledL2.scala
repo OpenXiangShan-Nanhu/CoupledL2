@@ -342,8 +342,8 @@ abstract class CoupledL2Base(implicit p: Parameters) extends LazyModule with Has
       val l2Flush = Option.when(cacheParams.enableL2Flush) (Input(Bool()))
       val l2FlushDone = Option.when(cacheParams.enableL2Flush) (Output(Bool()))
       val dft = new Bundle() {
-        val func      = Input(new SramBroadcastBundle)
-        val reset     = Input(new DFTResetSignals())
+        val func      = Option.when(cacheParams.hasMbist)(Input(new SramBroadcastBundle))
+        val reset     = Option.when(cacheParams.hasMbist)(Input(new DFTResetSignals()))
       }
       val ramctl = Input(new SramCtrlBundle)
     })
@@ -626,11 +626,12 @@ abstract class CoupledL2Base(implicit p: Parameters) extends LazyModule with Has
     private val cg = Option.when(cacheParams.hasMbist)(xs.utils.ClockGate.getTop)
     sigFromSrams.foreach({ case sig => sig := DontCare })
     if (cacheParams.hasMbist) {
-      cg.get.te := io.dft.func.cgen
-      sigFromSrams.get := io.dft.func
+      cg.get.te := io.dft.func.get.cgen
+      sigFromSrams.get := io.dft.func.get
     }
 
-    MbistInterface("L2Cache", io.dft.func, cacheParams.hasMbist)
+    val sramBroadcastBundleInst = io.dft.func.getOrElse(new SramBroadcastBundle())
+    MbistInterface("L2Cache", sramBroadcastBundleInst, cacheParams.hasMbist)
     SramHelper.genSramCtrlBundleTop() := io.ramctl
   }
 }
