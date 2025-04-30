@@ -95,7 +95,6 @@ class DataStorage(implicit p: Parameters) extends L2Module {
     val req = Flipped(ValidIO(new DSRequest))
     val rdata = Output(new DSECCBankBlock)
     val wdata = Input(new DSBlock)
-    val dft = Option.when(p(L2ParamKey).hasMbist)(Input(new SramBroadcastBundle))
   })
 
   // read data is set MultiCycle Path 2
@@ -105,11 +104,11 @@ class DataStorage(implicit p: Parameters) extends L2Module {
     way = 1,
     singlePort = true,
     latency = 2,
-    explictBist = p(L2ParamKey).hasMbist,
+    hasMbist = p(L2ParamKey).hasMbist,
+    pipeDepth = 1,
     extraHold = true,
     suffix = "_l2c_dat"
   ))
-  array.io.broadcast.foreach(_ := io.dft.get)
 
   val arrayIdx = Cat(io.req.bits.way, io.req.bits.set)
   val wen = io.req.valid && io.req.bits.wen

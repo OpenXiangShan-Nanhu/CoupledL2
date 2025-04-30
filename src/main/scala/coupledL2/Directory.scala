@@ -370,8 +370,17 @@ class Directory(implicit p: Parameters) extends L2Module {
   private val mbistPl = MbistPipeline.PlaceMbistPipeline(1, "MbistPipeL2Directory", mbist)
   mbistAck := mbistPl.map(_.mbist.mbist_ack).getOrElse(false.B)
   if(mbist) {
+    val mbistBankTagReadHigh = if (enableTagECC) {
+      VecInit(tagRead.map(x =>
+        Cat(VecInit(Seq.tabulate(tagBankSplit)(i => x(encTagBankBits * (i + 1) - 1, encTagBankBits * i)(x.getWidth - 1, tagBankBits))))
+      ))
+    } else {
+      VecInit(Seq.fill(ways)(0.U))
+    }
+    val mbistBankTagReadHighReg = RegEnable(mbistBankTagReadHigh,  0.U.asTypeOf(mbistBankTagReadHigh), mbistAck)
+    val combinedElements = Cat(mbistBankTagReadHighReg.zip(tagAll_s3).map { case (a, b) => Cat(a, b)}.reverse)
     val ramSeq = Seq(
-      tagArray -> tagAll_s3.asUInt,
+      tagArray -> combinedElements.asUInt,
       metaArray -> metaAll_s3.asUInt
     ) ++
       replacer_sram_opt.map(r => r -> repl_state_s3.asUInt) ++
