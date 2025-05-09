@@ -106,7 +106,8 @@ class DataStorage(implicit p: Parameters) extends L2Module {
     latency = 2,
     hasMbist = p(L2ParamKey).hasMbist,
     pipeDepth = 1,
-    extraHold = true,
+    extraHold = false,
+    explicitHold = true,
     suffix = "_l2c_dat"
   ))
 
