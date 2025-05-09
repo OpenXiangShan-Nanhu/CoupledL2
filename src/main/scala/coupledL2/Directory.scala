@@ -21,7 +21,7 @@ import chisel3._
 import chisel3.util._
 import xs.utils.mbist.MbistPipeline
 import coupledL2.utils._
-import xs.utils.{Code, HoldUnless, ParallelPriorityMux, RegNextN}
+import xs.utils.{Code, HoldUnless, ParallelPriorityMux, RegNextN, SyncDataModuleTemplate}
 import xs.utils.perf.XSPerfAccumulate
 import org.chipsalliance.cde.config.Parameters
 import freechips.rocketchip.tilelink.TLMessages._
@@ -345,17 +345,19 @@ class Directory(implicit p: Parameters) extends L2Module {
 
   // hit-Promotion, miss-Insertion for RRIP
   // origin-bit marks whether the data_block is reused
-  val origin_bit_opt = if(random_repl) None else
-    Some(Module(new SRAMTemplate(Bool(), sets, ways, singlePort = true, shouldReset = true, hasMbist = mbist , suffix = "_l2c_ori")))
-  val origin_bits_r = origin_bit_opt.map(_.io.r(io.read.fire, io.read.bits.set).resp.data).getOrElse(VecInit(Seq.fill(ways)(false.B)))
-  val origin_bits_rvld = RegNext(io.read.fire | mbistAck, false.B)
+  val origin_bit_opt = Option.when(!random_repl)(Mem(sets, Vec(ways, Bool())))
+  val origin_bits_r = origin_bit_opt.map(_.read(RegEnable(io.read.bits.set, io.read.fire))).getOrElse(VecInit(Seq.fill(ways)(false.B)))
+  val origin_bits_rvld = RegNext(io.read.fire, false.B)
   val origin_bits_reg = RegEnable(origin_bits_r, origin_bits_rvld)
   val origin_bits_hold = Mux(origin_bits_rvld, origin_bits_r, origin_bits_reg)
-  origin_bit_opt.get.io.w(
-      !resetFinish || replacerWen,
-      Mux(resetFinish, hit_s3, false.B),
-      Mux(resetFinish, req_s3.set, resetIdx),
-      UIntToOH(way_s3)
+  origin_bit_opt.foreach(m =>
+    when(!resetFinish || replacerWen) {
+      m.write(
+        Mux(resetFinish, req_s3.set, resetIdx),
+        VecInit(Seq.fill(ways)(resetFinish & hit_s3)),
+        UIntToOH(way_s3).asBools
+      )
+    }
   )
   val rrip_req_type = WireInit(0.U(4.W))
   // [3]: 0-firstuse, 1-reuse;
@@ -382,9 +384,7 @@ class Directory(implicit p: Parameters) extends L2Module {
     val ramSeq = Seq(
       tagArray -> combinedElements.asUInt,
       metaArray -> metaAll_s3.asUInt
-    ) ++
-      replacer_sram_opt.map(r => r -> repl_state_s3.asUInt) ++
-      origin_bit_opt.map(o => o -> origin_bits_reg.asUInt)
+    ) ++ replacer_sram_opt.map(r => r -> repl_state_s3.asUInt)
     val idToDat = ramSeq.map(elm => (elm._1.sp.mbistArrayIds.max, elm._2.asUInt)).toMap
     for(rp <- mbistPl.get.toSRAM) {
       val selOhReg = RegEnable(rp.selectedOH, rp.ack)
