@@ -118,7 +118,7 @@ class DataStorage(implicit p: Parameters) extends L2Module {
   val arrayWrite = Wire(new DSECCBankBlock)
   val arrayWriteData = if (enableDataECC) {
     Cat(VecInit(Seq.tabulate(dataBankSplit)(i =>
-      io.wdata.data(dataBankBits * (i + 1) - 1, dataBankBits * i))).map(data => cacheParams.dataCode.encode(data)))
+      io.wdata.data(dataBankBits * (i + 1) - 1, dataBankBits * i))).map(data => cacheParams.dataCode.encode(data)).reverse)
   } else {
     io.wdata.data
   }
