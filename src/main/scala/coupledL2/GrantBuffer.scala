@@ -162,7 +162,7 @@ class GrantBuffer(implicit p: Parameters) extends L2Module {
   val grantQueue_enq_isKeyword = Mux(io.d_task.bits.task.mergeA, mergeAtask.isKeyword.getOrElse(false.B), io.d_task.bits.task.isKeyword.getOrElse(false.B))
   // The following is organized in the order of data flow
   // =========== save d_task in queue[FIFO] ===========
-  grantQueue.io.enq.valid := io.d_task.valid && (dtaskOpcode =/= HintAck || io.d_task.bits.task.mergeA)
+  grantQueue.io.enq.valid := io.d_task.valid
   grantQueue.io.enq.bits.task := Mux(io.d_task.bits.task.mergeA, mergeAtask, io.d_task.bits.task)
   grantQueue.io.enq.bits.task.isKeyword.foreach(_ := grantQueue_enq_isKeyword)
   //grantQueue.io.enq.bits.task.isKeyword.foreach(_ := io.d_task.bits.task.isKeyword.getOrElse(false.B))
@@ -180,8 +180,8 @@ class GrantBuffer(implicit p: Parameters) extends L2Module {
 
   // =========== dequeue entry and fire ===========
   require(beatSize == 2)
-  val deqValid = grantQueue.io.deq.valid
   val deqTask = grantQueue.io.deq.bits.task
+  val deqValid = grantQueue.io.deq.valid && Mux(deqTask.opcode === HintAck, deqTask.mergeA, true.B)
  // val deqTask.isKeyword.foreach(_ := grantQueue.io.deq.bits.task.isKeyword)
   val deqId   = grantQueue.io.deq.bits.grantid
   val deqData = VecInit(Seq(grantQueueData0.io.deq.bits.data, grantQueueData1.io.deq.bits.data))
@@ -194,7 +194,7 @@ class GrantBuffer(implicit p: Parameters) extends L2Module {
     val grantid = UInt(mshrBits.W)
   }))
 
-  grantQueue.io.deq.ready := io.d.ready && !grantBufValid
+  grantQueue.io.deq.ready := Mux(deqTask.opcode === HintAck, !deqTask.mergeA || io.d.ready && !grantBufValid, io.d.ready && !grantBufValid)
   grantQueueData0.io.deq.ready := grantQueue.io.deq.ready
   grantQueueData1.io.deq.ready := grantQueue.io.deq.ready
 
