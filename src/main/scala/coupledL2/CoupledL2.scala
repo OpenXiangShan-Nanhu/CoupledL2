@@ -500,10 +500,9 @@ abstract class CoupledL2Base(implicit p: Parameters) extends LazyModule with Has
         slice
     }
 
-    val perfEvents = Seq(("noEvent", 0.U)) ++ slices.zipWithIndex.map {
-      case (slide, slide_idx) =>
-        slide.getPerfEvents.map{case (str, idx) => ("Slice" + slide_idx.toString + "_" + str, idx)}
-    }.flatten
+    val perfEvents = slices.zipWithIndex.flatMap { case (slide, slide_idx) =>
+      slide.getPerfEvents.map{case (str, idx) => ("Slice" + slide_idx.toString + "_" + str, idx)}
+    }
     generatePerfEvent()
 
     // ECC error
