@@ -165,31 +165,49 @@ class SinkA(implicit p: Parameters) extends L2Module {
   val mshrValid = io.cmoAll.map(_.mshrValid).getOrElse(false.B)
   val cmoLineDone = io.cmoAll.map(_.cmoLineDone).getOrElse(false.B)
 
+  def resetFlushState() = {
+    way.foreach { _ := 0.U }
+    set.foreach { _ := 0.U }
+    state.foreach { _ := sIDLE }
+  }
+
   when (stateVal === sIDLE && l2Flush && !mshrValid) {
     state.foreach { _ := sCMOREQ }
   }
-  when (stateVal === sCMOREQ && io.task.fire) {
-    state.foreach { _ := sWAITLINE }
+  when (stateVal === sCMOREQ) {
+    when(!l2Flush) {
+      resetFlushState()
+    }.elsewhen(io.task.fire) {
+      state.foreach { _ := sWAITLINE }
+    }
   }
-  when (stateVal === sWAITLINE && cmoLineDone) {
-    when (setVal === (cacheParams.sets-1).U && wayVal === (cacheParams.ways-1).U) { 
-      state.foreach { _ := sDONE }
-    }.otherwise {
-      when (wayVal === (cacheParams.ways-1).U) {
-        way.foreach { _ := 0.U }
-        set.foreach { _ := setVal + 1.U }
+  when (stateVal === sWAITLINE) {
+    when(!l2Flush) {
+      resetFlushState()
+    }.elsewhen(cmoLineDone) {
+      when (setVal === (cacheParams.sets-1).U && wayVal === (cacheParams.ways-1).U) { 
+        state.foreach { _ := sDONE }
       }.otherwise {
-        way.foreach { _ := wayVal + 1.U }
-      }
-      when (mshrValid) {
-        state.foreach { _ := sCMOREQ }
-      }.otherwise {
-        state.foreach { _ := sWAITMSHR }
+        when (wayVal === (cacheParams.ways-1).U) {
+          way.foreach { _ := 0.U }
+          set.foreach { _ := setVal + 1.U }
+        }.otherwise {
+          way.foreach { _ := wayVal + 1.U }
+        }
+        when (mshrValid) {
+          state.foreach { _ := sCMOREQ }
+        }.otherwise {
+          state.foreach { _ := sWAITMSHR }
+        }
       }
     }
   }
-  when (stateVal === sWAITMSHR && !mshrValid) {
-    state.foreach { _ := sCMOREQ }
+  when (stateVal === sWAITMSHR) {
+    when(!l2Flush) {
+      resetFlushState()
+    }.elsewhen(!mshrValid) {
+      state.foreach { _ := sCMOREQ }
+    }
   }
 
   // Performance counters
