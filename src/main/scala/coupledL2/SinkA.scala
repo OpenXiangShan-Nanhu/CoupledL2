@@ -132,15 +132,17 @@ class SinkA(implicit p: Parameters) extends L2Module {
     task.aMergeTask := 0.U.asTypeOf(new MergeTaskBundle)
     task
   }
+
+  val l2Flush = io.cmoAll.map(_.l2Flush).getOrElse(false.B)
   if (prefetchOpt.nonEmpty) {
-    io.task.valid := io.a.valid && !cmoAllBlock || io.prefetchReq.get.valid || cmoAllValid
+    io.task.valid := io.a.valid && !cmoAllBlock || io.prefetchReq.get.valid && !l2Flush || cmoAllValid
     io.task.bits := Mux(
       io.a.valid || cmoAllValid,
       fromTLAtoTaskBundle(io.a.bits),
       fromPrefetchReqtoTaskBundle(io.prefetchReq.get.bits
     ))
     io.a.ready := io.task.ready && !cmoAllBlock
-    io.prefetchReq.get.ready := io.task.ready && !io.a.valid
+    io.prefetchReq.get.ready := io.task.ready && !io.a.valid && !l2Flush
   } else {
     io.task.valid := io.a.valid && !cmoAllBlock || cmoAllValid
     io.task.bits := fromTLAtoTaskBundle(io.a.bits) 
@@ -161,7 +163,6 @@ class SinkA(implicit p: Parameters) extends L2Module {
    6. after all slices is flushed, inform Core                           |  io.cmoAll.l2FlushDone 
    7. after all slices is flushed, exit coherency                        |  TL2CHICoupledL2.io_chi.syscoreq
    ---------------------------------------------------------------------------------------------------------*/
-  val l2Flush = io.cmoAll.map(_.l2Flush).getOrElse(false.B)
   val mshrValid = io.cmoAll.map(_.mshrValid).getOrElse(false.B)
   val cmoLineDone = io.cmoAll.map(_.cmoLineDone).getOrElse(false.B)
 
