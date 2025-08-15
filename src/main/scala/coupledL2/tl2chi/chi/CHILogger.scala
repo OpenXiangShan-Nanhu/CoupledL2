@@ -88,7 +88,7 @@ class CHILogger(name: String, enable: Boolean)
         case (flit, chn) =>
           var lsb = 0
           flit.getElements.reverse.foreach { case e =>
-            e := chn.flit(lsb + e.asUInt.getWidth - 1, lsb).asTypeOf(e.cloneType)
+            e := chn.flit.asUInt(lsb + e.asUInt.getWidth - 1, lsb).asTypeOf(e.cloneType)
             lsb += e.asUInt.getWidth
           }
       }

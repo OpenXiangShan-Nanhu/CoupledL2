@@ -23,19 +23,19 @@ import org.chipsalliance.cde.config.Parameters
 import coupledL2.L2Module
 import xs.utils.perf.{XSPerfHistogram, QueuePerf, XSPerfAccumulate}
 
-class ChannelIO[+T <: Data](gen: T) extends Bundle {
+class ChannelIO[+T <: Data](gen: T, splitFlit: Boolean = false) extends Bundle {
   // Flit Pending. Early indication that a flit might be transmitted in the following cycle
   val flitpend = Output(Bool()) // To be confirmed: can this be ignored?
   // Flit Valid. The transmitter sets the signal HIGH to indicate when FLIT[(W-1):0] is valid.
   val flitv = Output(Bool())
   // Flit.
-  val flit = Output(UInt(gen.getWidth.W))
+  val flit = if (splitFlit) Output(gen) else Output(UInt(gen.getWidth.W))
   // L-Credit Valid. The receiver sets this signal HIGH to return a channel L-Credit to a transmitter.
   val lcrdv = Input(Bool())
 }
 
 object ChannelIO {
-  def apply[T <: Data](gen: T): ChannelIO[T] = new ChannelIO(gen)
+  def apply[T <: Data](gen: T, splitFlit: Boolean = false): ChannelIO[T] = new ChannelIO(gen, splitFlit)
 
   private final class EmptyBundle extends Bundle
   def apply(): ChannelIO[Data] = apply(new EmptyBundle)
@@ -56,16 +56,16 @@ trait HasSystemCoherencyInterface { this: Bundle =>
   val syscoack = Input(Bool())
 }
 
-class DownwardsLinkIO(implicit p: Parameters) extends Bundle with HasLinkSwitch {
-  val req = ChannelIO(new CHIREQ)
-  val rsp = ChannelIO(new CHIRSP)
-  val dat = ChannelIO(new CHIDAT)
+class DownwardsLinkIO(splitFlit: Boolean = false)(implicit p: Parameters) extends Bundle with HasLinkSwitch {
+  val req = ChannelIO(new CHIREQ, splitFlit)
+  val rsp = ChannelIO(new CHIRSP, splitFlit)
+  val dat = ChannelIO(new CHIDAT, splitFlit)
 }
 
-class UpwardsLinkIO(implicit p: Parameters) extends Bundle with HasLinkSwitch {
-  val rsp = ChannelIO(new CHIRSP)
-  val dat = ChannelIO(new CHIDAT)
-  val snp = ChannelIO(new CHISNP)
+class UpwardsLinkIO(splitFlit: Boolean = false)(implicit p: Parameters) extends Bundle with HasLinkSwitch {
+  val rsp = ChannelIO(new CHIRSP, splitFlit)
+  val dat = ChannelIO(new CHIDAT, splitFlit)
+  val snp = ChannelIO(new CHISNP, splitFlit)
 }
 
 class DecoupledDownwardsLinkIO(implicit p: Parameters) extends Bundle {
@@ -90,11 +90,11 @@ class DecoupledUpwardsNoSnpLinkIO(implicit p: Parameters) extends Bundle {
   val dat = DecoupledIO(new CHIDAT)
 }
 
-class PortIO(implicit p: Parameters) extends Bundle
+class PortIO(splitFlit: Boolean = false)(implicit p: Parameters) extends Bundle
   with HasPortSwitch
   with HasSystemCoherencyInterface {
-  val tx = new DownwardsLinkIO
-  val rx = Flipped(new UpwardsLinkIO)
+  val tx = new DownwardsLinkIO(splitFlit)
+  val rx = Flipped(new UpwardsLinkIO(splitFlit))
 }
 
 class DecoupledPortIO(implicit p: Parameters) extends Bundle {
@@ -187,7 +187,7 @@ class LCredit2Decoupled[T <: Bundle](
     queue.io.enq.bits.getElements.reverse.foreach { case e =>
       val elementWidth = e.asUInt.getWidth
       if (elementWidth > 0) {
-        e := io.in.flit(lsb + elementWidth - 1, lsb).asTypeOf(e.cloneType)
+        e := io.in.flit.asUInt(lsb + elementWidth - 1, lsb).asTypeOf(e.cloneType)
         lsb += elementWidth
       }
     }
@@ -217,7 +217,7 @@ class LCredit2Decoupled[T <: Bundle](
     io.out.bits.getElements.reverse.foreach { case e =>
       val elementWidth = e.asUInt.getWidth
       if (elementWidth > 0) {
-        e := io.in.flit(lsb + elementWidth - 1, lsb).asTypeOf(e.cloneType)
+        e := io.in.flit.asUInt(lsb + elementWidth - 1, lsb).asTypeOf(e.cloneType)
         lsb += elementWidth
       }
     }
