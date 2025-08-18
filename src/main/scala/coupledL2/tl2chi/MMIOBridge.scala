@@ -74,7 +74,7 @@ class MMIOBridgeEntry(edge: TLEdgeIn)(implicit p: Parameters) extends TL2CHIL2Mo
   //
   //          2) For Device backend, the observability of possible weakly-ordered intermediate states were determined
   //          by the HN (Home Node) on bus with Endpoint Ordering.
-  val bufferableNC = true
+  val bufferableNC = false
 
   require(!bufferableNC || needRR , "DO NOT set 'bufferableNC = true' when 'needRR = false'")
 
