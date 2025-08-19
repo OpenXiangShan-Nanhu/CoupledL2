@@ -28,7 +28,7 @@ import coupledL2.HasCoupledL2Parameters
 import xs.utils.{ParallelLookUp, ParallelPriorityMux, RRArbiterInit, SECDEDCode, ZeroExt}
 import xs.utils.perf.XSPerfAccumulate
 import xs.utils.debug.HAssert
-import xs.utils.cache.{MemBackTypeMM, MemPageTypeNC}
+import xs.utils.cache.{DeviceType}
 
 class MMIOBridge()(implicit p: Parameters) extends LazyModule
   with HasCoupledL2Parameters
@@ -53,7 +53,7 @@ class MMIOBridge()(implicit p: Parameters) extends LazyModule
       supportsPutPartial = TransferSizes(1, 8)
     )),
     beatBytes = 8,
-    requestKeys = Seq(MemBackTypeMM, MemPageTypeNC)
+    requestKeys = Seq(DeviceType)
   )))
 
   lazy val module = new MMIOBridgeImp(this)
@@ -112,8 +112,7 @@ class MMIOBridgeEntry(edge: TLEdgeIn)(implicit p: Parameters) extends TL2CHIL2Mo
   val corrupt = Reg(Bool())
   val traceTag = Reg(Bool())
   val isRead = req.opcode === Get
-  val isBackTypeMM = req.user.lift(MemBackTypeMM).getOrElse(false.B)
-  val isPageTypeNC = req.user.lift(MemPageTypeNC).getOrElse(false.B)
+  val isDeviceType = req.user.lift(DeviceType).getOrElse(true.B)
 
   require(io.req.bits.data.getWidth == wordBits)
   val wordBytes = wordBits / 8
@@ -250,15 +249,15 @@ class MMIOBridgeEntry(edge: TLEdgeIn)(implicit p: Parameters) extends TL2CHIL2Mo
   //    PMA = NC/IO, PBMT = IO -> Device nRnE (no reorder, no early acknowlegment)
   txreq.bits.order := {
     if (needRR) 
-      Mux(!isBackTypeMM, OrderEncodings.EndpointOrder, OrderEncodings.RequestOrder)
+      Mux(isDeviceType, OrderEncodings.EndpointOrder, OrderEncodings.RequestOrder)
     else 
       OrderEncodings.None
   }
   txreq.bits.memAttr := MemAttr(
     allocate = false.B,
     cacheable = false.B,
-    device = !isBackTypeMM,
-    ewa = if (bufferableNC) (isPageTypeNC || isBackTypeMM) else false.B
+    device = isDeviceType,
+    ewa = false.B
   )
   txreq.bits.mpam.foreach(_ := MPAM(txreq.bits.ns))
 
