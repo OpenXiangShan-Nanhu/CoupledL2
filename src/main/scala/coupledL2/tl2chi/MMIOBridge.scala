@@ -248,8 +248,8 @@ class MMIOBridgeEntry(edge: TLEdgeIn)(implicit p: Parameters) extends TL2CHIL2Mo
   //    PMA = NC/IO, PBMT = NC -> Device nRE  (no reorder, early acknowlegment)
   //    PMA = NC/IO, PBMT = IO -> Device nRnE (no reorder, no early acknowlegment)
   txreq.bits.order := {
-    if (needRR) 
-      Mux(isDeviceType, OrderEncodings.EndpointOrder, OrderEncodings.RequestOrder)
+    if (needRR)
+      OrderEncodings.EndpointOrder
     else 
       OrderEncodings.None
   }
