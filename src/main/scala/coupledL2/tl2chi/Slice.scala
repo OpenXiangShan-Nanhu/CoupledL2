@@ -23,6 +23,7 @@ import xs.utils.mbist.{MbistPipeline, Ram2MbistParams}
 import org.chipsalliance.cde.config.Parameters
 import coupledL2._
 import coupledL2.prefetch.PrefetchIO
+import xs.utils.{ModuleNode, ResetGen, ResetGenNode}
 import xs.utils.debug.HAssert
 import xs.utils.cache.common.L2ParamKey
 import xs.utils.sram.SramBroadcastBundle
@@ -246,4 +247,9 @@ class Slice()(implicit p: Parameters) extends BaseSlice[OuterBundle]
   generatePerfEvent()
   private val mbistPl = MbistPipeline.PlaceMbistPipeline(2, "MbistPipeL2Slice", hasMbist)
   HAssert.placePipe(3)
+
+  private val resetMisc = withReset(reset){ ResetGen(2, Some(io.dft_reset)) }
+  private val resetMshr = withReset(reset){ ResetGen(2, Some(io.dft_reset)) }
+  implicitReset := resetMisc
+  mshrCtl.reset := resetMshr
 }

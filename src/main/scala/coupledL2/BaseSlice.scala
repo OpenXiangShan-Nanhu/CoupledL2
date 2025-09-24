@@ -22,6 +22,7 @@ import chisel3.util._
 import org.chipsalliance.cde.config.Parameters
 import freechips.rocketchip.tilelink.TLBundle
 import coupledL2.prefetch.PrefetchIO
+import xs.utils.DFTResetSignals
 import xs.utils.perf.HasPerfEvents
 
 trait BaseOuterBundle
@@ -39,8 +40,14 @@ abstract class BaseSliceIO[T_OUT <: BaseOuterBundle](implicit p: Parameters) ext
   val l2Miss = Output(Bool())
   val l2Flush = Option.when(cacheParams.enableL2Flush) (Input(Bool()))
   val l2FlushDone = Option.when(cacheParams.enableL2Flush) (Output(Bool()))
+  val dft_reset = Input(new DFTResetSignals)
 }
 
-abstract class BaseSlice[T_OUT <: BaseOuterBundle](implicit p: Parameters) extends L2Module with HasPerfEvents {
+abstract class BaseSlice[T_OUT <: BaseOuterBundle](implicit p: Parameters) extends L2RawModule with HasPerfEvents with ImplicitClock with ImplicitReset {
   val io: BaseSliceIO[T_OUT]
+  val clock = IO(Input(Clock()))
+  val reset = IO(Input(Reset()))
+
+  override val implicitClock = WireInit(clock)
+  override val implicitReset = WireInit(reset)
 }

@@ -26,6 +26,7 @@ import xs.utils.tl.MemReqSource
 
 abstract class L2Module(implicit val p: Parameters) extends Module with HasCoupledL2Parameters
 abstract class L2Bundle(implicit val p: Parameters) extends Bundle with HasCoupledL2Parameters
+abstract class L2RawModule(implicit val p: Parameters) extends RawModule with HasCoupledL2Parameters
 
 class ReplacerInfo(implicit p: Parameters) extends L2Bundle {
   val channel = UInt(3.W)

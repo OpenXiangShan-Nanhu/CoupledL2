@@ -428,24 +428,23 @@ abstract class CoupledL2Base(implicit p: Parameters) extends LazyModule with Has
     val slices = node.in.zip(node.out).zipWithIndex.map {
       case (((in, edgeIn), (out, edgeOut)), i) =>
         require(in.params.dataBits == out.params.dataBits)
-        val rst_L2 = ResetGen(3, io.dft.reset)
-        val slice = withReset(rst_L2) {
-          if (enableCHI) {
-            Module(new tl2chi.Slice()(p.alterPartial {
-              case EdgeInKey => edgeIn
-              case EdgeOutKey => edgeOut
-              case BankBitsKey => bankBits
-              case SliceIdKey => i
-            }))
-          } else {
-            Module(new tl2tl.Slice()(p.alterPartial {
-              case EdgeInKey => edgeIn
-              case EdgeOutKey => edgeOut
-              case BankBitsKey => bankBits
-              case SliceIdKey => i
-            }))
-          }
+        val slice = if (enableCHI) {
+          Module(new tl2chi.Slice()(p.alterPartial {
+            case EdgeInKey => edgeIn
+            case EdgeOutKey => edgeOut
+            case BankBitsKey => bankBits
+            case SliceIdKey => i
+          }))
+        } else {
+          Module(new tl2tl.Slice()(p.alterPartial {
+            case EdgeInKey => edgeIn
+            case EdgeOutKey => edgeOut
+            case BankBitsKey => bankBits
+            case SliceIdKey => i
+          }))
         }
+        slice.clock := clock
+        slice.reset := reset
         slice.io.in <> in
         if (enableHintGuidedGrant) {
           // If the hint of slice X is selected at cycle T, then at cycle (T + 3) & (T + 4)
@@ -462,6 +461,7 @@ abstract class CoupledL2Base(implicit p: Parameters) extends LazyModule with Has
         }
         in.b.bits.address := restoreAddress(slice.io.in.b.bits.address, i)
         slice.io.sliceId := i.U
+        slice.io.dft_reset := io.dft.reset.getOrElse(0.U.asTypeOf(new DFTResetSignals))
 
         slice.io.error.ready := enableECC.asBool // TODO: fix the datapath as optional
 
