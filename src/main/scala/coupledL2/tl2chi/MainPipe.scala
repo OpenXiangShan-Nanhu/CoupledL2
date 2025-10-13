@@ -1103,7 +1103,7 @@ class MainPipe(implicit p: Parameters) extends TL2CHIL2Module with HasCHIOpcodes
     ("l2_cache_wb_cleaning_coh", task_s3.valid && mshr_snpRespDataX_s3),
     ("l2_cache_access_rd", task_s3.valid && sinkA_req_s3 && !req_prefetch_s3),
     ("l2_cache_access_wr", task_s3.valid && sinkC_req_s3),
-    ("l2_cache_inv", task_s3.valid && sinkB_req_s3 && (req_s3.param === toN))
+    ("l2_cache_inv", task_s3.valid && sinkB_req_s3 && isSnpToN(req_s3.chiOpcode.get))
   )
   generatePerfEvent()
 }
