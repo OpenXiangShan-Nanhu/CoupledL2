@@ -267,10 +267,12 @@ class TL2CHICoupledL2(implicit p: Parameters) extends CoupledL2Base {
         val rxdatIsMMIO = rxdat.bits.txnID.head(1).asBool
         val rxdatSliceID = getSliceID(rxdat.bits.txnID)
         slices.zipWithIndex.foreach { case (s, i) =>
-          s.io.prefetch.get.req.valid := !prefBlocker.io.alreadyBlock &&
-            prefetcher.get.io.req.valid &&
-            bank_eq(Cat(prefetcher.get.io.req.bits.tag, prefetcher.get.io.req.bits.set), i, bankBits)
-          s.io.prefetch.get.req.bits:= prefetcher.get.io.req.bits
+          prefetchOpt.foreach { _ =>
+            s.io.prefetch.get.req.valid := !prefBlocker.io.alreadyBlock &&
+              prefetcher.get.io.req.valid &&
+              bank_eq(Cat(prefetcher.get.io.req.bits.tag, prefetcher.get.io.req.bits.set), i, bankBits)
+            s.io.prefetch.get.req.bits:= prefetcher.get.io.req.bits
+          }
           s.io.out.rx.dat.valid := rxdat.valid && rxdatSliceID === i.U && !rxdatIsMMIO
           s.io.out.rx.dat.bits := rxdat.bits
           s.io.out.rx.dat.bits.txnID := restoreTXNID(rxdat.bits.txnID)
