@@ -16,6 +16,10 @@ verilog:
 	@$(MKDIR_CMD)
 	mill -i CoupledL2.test.runMain top.TopMain --split-verilog --target systemverilog --full-stacktrace -td build/rtl
 
+ut-verilog:
+	@$(MKDIR_CMD)
+	mill -i CoupledL2.test.runMain top.UTTopMain --split-verilog --target systemverilog --full-stacktrace -td build/rtl
+
 clean:
 	rm -rf ./build
 

@@ -135,7 +135,7 @@ class LCredit2Decoupled[T <: Bundle](
   blocking: Boolean = true
 )(implicit p: Parameters) extends Module {
   val io = IO(new Bundle() {
-    val in = Flipped(ChannelIO(gen.cloneType))
+    val in = Flipped(ChannelIO(gen.cloneType, splitFlit = p(SplitCHI)))
     val out = DecoupledIO(gen.cloneType)
     val state = Input(new LinkState())
     val reclaimLCredit = Output(Bool())
@@ -257,7 +257,7 @@ object LCredit2Decoupled {
 class Decoupled2LCredit[T <: Bundle](gen: T)(implicit p: Parameters) extends Module {
   val io = IO(new Bundle() {
     val in = Flipped(DecoupledIO(gen.cloneType))
-    val out = ChannelIO(gen.cloneType)
+    val out = ChannelIO(gen.cloneType, splitFlit = p(SplitCHI))
     val state = Input(new LinkState())
   })
 
@@ -291,7 +291,11 @@ class Decoupled2LCredit[T <: Bundle](gen: T)(implicit p: Parameters) extends Mod
   io.out <> out
   out.flitpend := RegNext(true.B, init = false.B) // TODO
   out.flitv := RegNext(flitv, init = false.B)
-  out.flit := RegEnable(Mux(io.in.valid, Cat(io.in.bits.getElements.map(_.asUInt)), 0.U /* LCrdReturn */), flitv)
+  if (p(SplitCHI)) {
+    out.flit := RegEnable(Mux(io.in.valid, io.in.bits, 0.U.asTypeOf(out.flit.cloneType) /* LCrdReturn */), flitv)
+  } else {
+    out.flit := RegEnable(Mux(io.in.valid, Cat(io.in.bits.getElements.map(_.asUInt)), 0.U /* LCrdReturn */), flitv)
+  }
 
   /**
     * performance counters
@@ -318,7 +322,7 @@ object Decoupled2LCredit {
 class LinkMonitor(implicit p: Parameters) extends L2Module with HasCHIOpcodes {
   val io = IO(new Bundle() {
     val in = Flipped(new DecoupledPortIO())
-    val out = new PortIO
+    val out = new PortIO(splitFlit = p(SplitCHI))
     val nodeID = Input(UInt(NODEID_WIDTH.W))
     val exitco = Option.when(cacheParams.enableL2Flush) (Input(Bool()))
   })

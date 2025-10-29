@@ -36,6 +36,7 @@ abstract class TL2CHIL2Module(implicit val p: Parameters) extends Module
   with HasCHIMsgParameters
 
 case object DecoupledCHI extends Field[Boolean](false)
+case object SplitCHI extends Field[Boolean](false)
 
 class TL2CHICoupledL2(implicit p: Parameters) extends CoupledL2Base {
 
@@ -68,7 +69,7 @@ class TL2CHICoupledL2(implicit p: Parameters) extends CoupledL2Base {
   class CoupledL2Imp(wrapper: LazyModule) extends BaseCoupledL2Imp(wrapper)
     with HasCHIOpcodes {
 
-    val io_chi = if(p(DecoupledCHI)) IO(new DecoupledPortIO) else IO(new PortIO)
+    val io_chi = if(p(DecoupledCHI)) IO(new DecoupledPortIO) else IO(new PortIO(splitFlit = p(SplitCHI)))
     val io_nodeID = IO(Input(UInt()))
     val io_cpu_halt = Option.when(cacheParams.enableL2Flush) (IO(Input(Bool())))
 
