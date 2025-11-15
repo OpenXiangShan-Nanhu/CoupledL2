@@ -184,11 +184,21 @@ class LCredit2Decoupled[T <: Bundle](
     queue.io.enq.valid := accept
     // queue.io.enq.bits := io.in.bits
     var lsb = 0
-    queue.io.enq.bits.getElements.reverse.foreach { case e =>
-      val elementWidth = e.asUInt.getWidth
-      if (elementWidth > 0) {
-        e := io.in.flit.asUInt(lsb + elementWidth - 1, lsb).asTypeOf(e.cloneType)
-        lsb += elementWidth
+    if (p(SplitCHI)) {
+      queue.io.enq.bits.getElements.foreach { case e =>
+        val elementWidth = e.asUInt.getWidth
+        if (elementWidth > 0) {
+          e := io.in.flit.asUInt(lsb + elementWidth - 1, lsb).asTypeOf(e.cloneType)
+          lsb += elementWidth
+        }
+      }
+    } else {
+      queue.io.enq.bits.getElements.reverse.foreach { case e =>
+        val elementWidth = e.asUInt.getWidth
+        if (elementWidth > 0) {
+          e := io.in.flit.asUInt(lsb + elementWidth - 1, lsb).asTypeOf(e.cloneType)
+          lsb += elementWidth
+        }
       }
     }
 
@@ -214,11 +224,21 @@ class LCredit2Decoupled[T <: Bundle](
 
     io.out.valid := accept && !lcreditReturn
     var lsb = 0
-    io.out.bits.getElements.reverse.foreach { case e =>
-      val elementWidth = e.asUInt.getWidth
-      if (elementWidth > 0) {
-        e := io.in.flit.asUInt(lsb + elementWidth - 1, lsb).asTypeOf(e.cloneType)
-        lsb += elementWidth
+    if (p(SplitCHI)) {
+      io.out.bits.getElements.foreach { case e =>
+        val elementWidth = e.asUInt.getWidth
+        if (elementWidth > 0) {
+          e := io.in.flit.asUInt(lsb + elementWidth - 1, lsb).asTypeOf(e.cloneType)
+          lsb += elementWidth
+        }
+      }
+    } else {
+      io.out.bits.getElements.reverse.foreach { case e =>
+        val elementWidth = e.asUInt.getWidth
+        if (elementWidth > 0) {
+          e := io.in.flit.asUInt(lsb + elementWidth - 1, lsb).asTypeOf(e.cloneType)
+          lsb += elementWidth
+        }
       }
     }
     val opcodeElements = io.out.bits.elements.filter(_._1 == "opcode")
