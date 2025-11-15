@@ -142,7 +142,7 @@ class UTTopConfig
           enableDataECC = true,
           enableL2Flush = true,
           prefetch = Nil,
-          clientCaches = Seq(L1Param(sets = 128, ways = 4, vaddrBitsOpt = Some(48))),
+          clientCaches = Seq(L1Param(sets = 128, ways = 4, vaddrBitsOpt = Some(48), aliasBitsOpt = Some(2))),
           hasMbist = true
         )
       case CHIIssue              => Issue.Eb
