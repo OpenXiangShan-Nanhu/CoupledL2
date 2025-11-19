@@ -346,6 +346,7 @@ abstract class CoupledL2Base(implicit p: Parameters) extends LazyModule with Has
         val reset     = Option.when(cacheParams.hasMbist)(Input(new DFTResetSignals()))
       }
       val ramctl = Input(new SramCtrlBundle)
+      val l2Busy = Output(Bool()) // Indicate whether L2Cache is busy(has pending requests)
     })
 
     // Display info
@@ -466,6 +467,8 @@ abstract class CoupledL2Base(implicit p: Parameters) extends LazyModule with Has
         slice.io.error.ready := enableECC.asBool // TODO: fix the datapath as optional
 
         slice.io.l2Flush.foreach(_ := io.l2Flush.getOrElse(false.B))
+
+        io.l2Busy := slice.io.l2Busy
 
         slice.io.prefetch.zip(prefetcher).foreach {
           case (s, p) =>

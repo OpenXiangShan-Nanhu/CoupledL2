@@ -41,6 +41,7 @@ abstract class BaseSliceIO[T_OUT <: BaseOuterBundle](implicit p: Parameters) ext
   val l2Flush = Option.when(cacheParams.enableL2Flush) (Input(Bool()))
   val l2FlushDone = Option.when(cacheParams.enableL2Flush) (Output(Bool()))
   val dft_reset = Input(new DFTResetSignals)
+  val l2Busy = Output(Bool())
 }
 
 abstract class BaseSlice[T_OUT <: BaseOuterBundle](implicit p: Parameters) extends L2RawModule with HasPerfEvents with ImplicitClock with ImplicitReset {

@@ -111,6 +111,7 @@ class UTTop(implicit p: Parameters) extends LazyModule {
     val io = IO(new Bundle {
       val l2Flush = Input(Bool())
       val l2FlushDone = Output(Bool())
+      val l2Busy = Output(Bool())
     })
 
     l2cache.module.io <> DontCare
@@ -118,6 +119,8 @@ class UTTop(implicit p: Parameters) extends LazyModule {
     l2cache.module.io_cpu_halt.foreach(_ := false.B)
     l2cache.module.io.l2Flush.foreach(_ := io.l2Flush)
     l2cache.module.io.l2FlushDone.foreach(io.l2FlushDone := _)
+
+    io.l2Busy := l2cache.module.io.l2Busy
 
     dontTouch(l2cache.module.io)
 

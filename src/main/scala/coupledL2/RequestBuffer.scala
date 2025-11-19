@@ -87,6 +87,7 @@ class RequestBuffer(flow: Boolean = true, entries: Int = 4)(implicit p: Paramete
 
     val hasLatePF = Output(Bool())
     val hasMergeA = Output(Bool())
+    val busy = Output(Bool())
   })
 
   /* ======== Data Structure ======== */
@@ -292,6 +293,9 @@ class RequestBuffer(flow: Boolean = true, entries: Int = 4)(implicit p: Paramete
 
   // for Dir to choose a free way
   io.out.bits.wayMask := Fill(cacheParams.ways, 1.U(1.W))
+
+  val bufferValidVec = VecInit(buffer.map(_.valid)).asUInt
+  io.busy := bufferValidVec.orR || io.in.valid
 
   // add XSPerf to see how many cycles the req is held in Buffer
   if(cacheParams.enablePerf) {
