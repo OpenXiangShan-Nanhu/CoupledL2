@@ -191,6 +191,13 @@ class Slice()(implicit p: Parameters) extends BaseSlice[OuterBundle] {
   )
   io.l2Miss := mshrCtl.io.l2Miss
 
+  val reqBufBusy = a_reqBuf.io.busy
+  val reqArbBusy = reqArb.io.status_vec.map(_.valid).reduce(_||_)
+  val mainPipeBusy = mainPipe.io.status_vec_toD.map(_.valid).reduce(_||_)
+  val mshrBusy = mshrCtl.io.msInfo.map(_.valid).reduce(_||_)
+  val grantBufBusy = grantBuf.io.grantStatus.map(_.valid).reduce(_||_)
+  io.l2Busy := reqBufBusy || reqArbBusy || mainPipeBusy || mshrBusy || grantBufBusy
+
   if (cacheParams.enablePerf) {
     val a_begin_times = RegInit(VecInit(Seq.fill(sourceIdAll)(0.U(64.W))))
     val timer = RegInit(0.U(64.W))
