@@ -426,6 +426,9 @@ abstract class CoupledL2Base(implicit p: Parameters) extends LazyModule with Has
     val releaseSourceD = Wire(Vec(banks, Bool()))
     val allCanFire = (RegNextN(!hintFire, sliceAhead) && RegNextN(!hintFire, sliceAhead + 1)) || Cat(releaseSourceD).orR
 
+    val l2BusyVec = Wire(Vec(banks, Bool()))
+    io.l2Busy := l2BusyVec.reduce(_ || _)
+
     val slices = node.in.zip(node.out).zipWithIndex.map {
       case (((in, edgeIn), (out, edgeOut)), i) =>
         require(in.params.dataBits == out.params.dataBits)
@@ -468,7 +471,7 @@ abstract class CoupledL2Base(implicit p: Parameters) extends LazyModule with Has
 
         slice.io.l2Flush.foreach(_ := io.l2Flush.getOrElse(false.B))
 
-        io.l2Busy := slice.io.l2Busy
+        l2BusyVec(i) := slice.io.l2Busy
 
         slice.io.prefetch.zip(prefetcher).foreach {
           case (s, p) =>
