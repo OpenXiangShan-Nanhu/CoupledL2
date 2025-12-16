@@ -140,7 +140,7 @@ class TopConfig extends Config((up, here, site) => {
   case DecoupledCHI => true
 })
 
-object TopMain extends App {
+object L2TopMain extends App {
   private val firtoolOpts = Seq(
     FirtoolOption("-O=release"),
     FirtoolOption("--disable-annotation-unknown"),
