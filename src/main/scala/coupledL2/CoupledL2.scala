@@ -628,7 +628,7 @@ abstract class CoupledL2Base(implicit p: Parameters) extends LazyModule with Has
     XSPerfAccumulate("ok2Hints", okHint)
 
     private val sigFromSrams = Option.when(cacheParams.hasMbist)(SramHelper.genBroadCastBundleTop())
-    private val cg = Option.when(cacheParams.hasMbist)(xs.utils.ClockGate.getTop)
+    private val cg = Option.when(cacheParams.hasMbist)(xs.utils.verilog.ClockGate.getTop)
     sigFromSrams.foreach({ case sig => sig := DontCare })
     if (cacheParams.hasMbist) {
       cg.get.te := io.dft.func.get.cgen

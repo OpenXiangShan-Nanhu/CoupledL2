@@ -25,7 +25,7 @@ import coupledL2.utils.SplittedSRAM
 import xs.utils.debug.HAssert
 import xs.utils.cache.common.L2ParamKey
 import xs.utils.sram.{SRAMTemplate, SramBroadcastBundle}
-import xs.utils.ClockGate
+import xs.utils.verilog.ClockGate
 
 class DSRequest(implicit p: Parameters) extends L2Bundle {
   val way = UInt(wayBits.W)
