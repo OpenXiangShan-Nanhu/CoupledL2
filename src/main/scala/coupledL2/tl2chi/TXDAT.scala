@@ -137,6 +137,7 @@ class TXDAT(implicit p: Parameters) extends TL2CHIL2Module with HasCHIOpcodes {
         case 2 =>
           val code = new SECDEDCode
           VecInit((0 until DATACHECK_WIDTH).map(i => code.encode(beat(8 * (i + 1) - 1, 8 * i)))).asUInt
+        case 3 => VecInit((0 until DATACHECK_WIDTH).map(i => beat(8 * (i + 1) - 1, 8 * i).xorR)).asUInt
         case _ => 0.U(DATACHECK_WIDTH.W)
       }
     } else {

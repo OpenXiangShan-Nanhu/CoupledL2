@@ -300,6 +300,7 @@ trait HasCHIMsgParameters {
     case "none" => 0
     case "oddparity" => 1
     case "secded" => 2
+    case "evenparity" => 3
     case _ => 0
   }
   def enableDataCheck = dataCheckMethod != 0
