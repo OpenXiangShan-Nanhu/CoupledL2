@@ -454,7 +454,15 @@ class PCrdGrantMatcher(val numPorts: Int) extends Module {
 
 class L2CacheErrorInfo(implicit p: Parameters) extends L2Bundle {
   val valid = Bool()
+  val source = UInt(3.W)
   val address = UInt(addressBits.W)
+}
+
+class L2CacheInjectBundle(implicit p: Parameters) extends L2Bundle {
+  val injEn     = Bool()
+  val injSource = UInt(3.W) // 100=L2CACHE_TAG, 101=L2CACHE_DATA
+  val injBits   = Bool()    // 0=1-bit, 1=2-bit
+  val reserved  = Bool()
 }
 
 class IOCMOAll(implicit p: Parameters) extends Bundle {

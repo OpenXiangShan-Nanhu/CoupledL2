@@ -126,6 +126,9 @@ class Directory(implicit p: Parameters) extends L2Module {
     val replResp = ValidIO(new ReplacerResult)
     // used to count occWays for Grant to retry
     val msInfo = Vec(mshrsAll, Flipped(ValidIO(new MSHRInfo)))
+    // error injection control
+    val inject_error = Input(new L2CacheInjectBundle)
+    val inject_error_consumed = Output(Bool())
   })
 
   def invalid_way_sel(metaVec: Seq[MetaEntry], repl: UInt) = {
@@ -202,12 +205,21 @@ class Directory(implicit p: Parameters) extends L2Module {
     io.tagWReq.bits.wtag
   }
   val tagRead = tagArray.io.r(io.read.fire, io.read.bits.set).resp.data
+  private def eccPoisonMask(width: Int, injectTwoBits: Bool): UInt = {
+    if(width > 1) Mux(injectTwoBits, 3.U(width.W), 1.U(width.W)) else 1.U(width.W)
+  }
+  val tagInjectEn = io.inject_error.injEn && io.inject_error.injSource === 4.U(3.W) // L2CACHE_TAG
+  val tagInjectFire = tagInjectEn && io.read.fire
+  val tagInjectMask = if (enableTagECC) {
+    VecInit(Seq.tabulate(tagBankSplit)(i => eccPoisonMask(encTagBankBits, io.inject_error.injBits))).asUInt
+  } else { 0.U }
+  val tagReadInj = tagRead.map(_ ^ Mux(tagInjectFire, tagInjectMask, 0.U))
   val bankTagRead = if (enableTagECC) {
-    tagRead.map(x =>
+    tagReadInj.map(x =>
       Cat(VecInit(Seq.tabulate(tagBankSplit)(i => x(encTagBankBits * (i + 1) - 1, encTagBankBits * i)(tagBankBits - 1, 0))))
     )
   } else {
-    tagRead
+    tagReadInj
   }
   tagRead_s3 := bankTagRead
   tagArray.io.w(
@@ -218,7 +230,7 @@ class Directory(implicit p: Parameters) extends L2Module {
   )
 
   val bankTagError = if (enableTagECC) {
-    tagRead.map(x =>
+    tagReadInj.map(x =>
       VecInit(Seq.tabulate(tagBankSplit)(i => x(encTagBankBits * (i + 1) - 1, encTagBankBits * i))).
         map(tag => cacheParams.dataCode.decode(tag).error).reduce(_ | _)
     )
@@ -226,6 +238,7 @@ class Directory(implicit p: Parameters) extends L2Module {
     VecInit(Seq.fill(ways)(false.B))
   }
   errorRead := bankTagError
+  io.inject_error_consumed := tagInjectFire
 
   // Meta R/W
   metaRead := metaArray.io.r(io.read.fire, io.read.bits.set).resp.data

@@ -339,6 +339,9 @@ abstract class CoupledL2Base(implicit p: Parameters) extends LazyModule with Has
       }
       val l2Miss = Output(Bool())
       val error = Output(new L2CacheErrorInfo()(l2ECCParams))
+      val error_event = Output(Valid(new L2CacheErrorInfo()(l2ECCParams)))
+      val inject_error = Input(new L2CacheInjectBundle)
+      val inject_error_consumed = Output(Bool())
       val l2Flush = Option.when(cacheParams.enableL2Flush) (Input(Bool()))
       val l2FlushDone = Option.when(cacheParams.enableL2Flush) (Output(Bool()))
       val dft = new Bundle() {
@@ -465,6 +468,7 @@ abstract class CoupledL2Base(implicit p: Parameters) extends LazyModule with Has
         slice.io.dft_reset := io.dft.reset.getOrElse(0.U.asTypeOf(new DFTResetSignals))
 
         slice.io.error.ready := enableECC.asBool // TODO: fix the datapath as optional
+        slice.io.inject_error := io.inject_error
 
         slice.io.l2Flush.foreach(_ := io.l2Flush.getOrElse(false.B))
 
@@ -521,11 +525,22 @@ abstract class CoupledL2Base(implicit p: Parameters) extends LazyModule with Has
       l2ECCArb.io.in <> VecInit(slices_l2ECC)
       l2ECCArb.io.out.ready := true.B
       io.error.valid := l2ECCArb.io.out.fire && l2ECCArb.io.out.bits.valid
+      io.error.source := l2ECCArb.io.out.bits.source
       io.error.address := l2ECCArb.io.out.bits.address
+      io.error_event.valid := io.error.valid
+      io.error_event.bits.valid   := io.error.valid
+      io.error_event.bits.source := io.error.source
+      io.error_event.bits.address := io.error.address
     } else {
       io.error.valid := false.B
+      io.error.source := 0.U
       io.error.address := 0.U.asTypeOf(io.error.address)
+      io.error_event.valid := false.B
+      io.error_event.bits.valid   := false.B
+      io.error_event.bits.source := 0.U
+      io.error_event.bits.address := 0.U.asTypeOf(io.error.address)
     }
+    io.inject_error_consumed := VecInit(slices.map(_.io.inject_error_consumed)).reduce(_ || _)
 
     //L2 Flush Done
     io.l2FlushDone.foreach(_ :=  VecInit(slices.zipWithIndex.map { case (s, i) => s.io.l2FlushDone.getOrElse(false.B)}).reduce(_&_) )

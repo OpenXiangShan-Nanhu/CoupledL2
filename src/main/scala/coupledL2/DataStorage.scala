@@ -88,6 +88,10 @@ class DataStorage(implicit p: Parameters) extends L2Module {
     // ECC error
     val error = Output(Bool())
 
+    // error injection control
+    val inject_error = Input(new L2CacheInjectBundle)
+    val inject_error_consumed = Output(Bool())
+
     // 1. there is only 1 read or write request in the same cycle,
     // so only 1 req port is necessary
     // 2. according to the requirement of MCP2, [req.valid, req.bits, wdata]
@@ -124,12 +128,25 @@ class DataStorage(implicit p: Parameters) extends L2Module {
   }
   arrayWrite.data := arrayWriteData
 
-  val arrayRead = array.io.r.resp.data(0)
+  val arrayReadRaw = array.io.r.resp.data(0)
 
   // make sure SRAM input signals will not change during the two cycles
   // TODO: This check is done elsewhere
   array.io.w.apply(wen, arrayWrite, arrayIdx, 1.U)
   array.io.r.apply(ren, arrayIdx)
+
+  private def eccPoisonMask(width: Int, injectTwoBits: Bool): UInt = {
+    if(width > 1) Mux(injectTwoBits, 3.U(width.W), 1.U(width.W)) else 1.U(width.W)
+  }
+  val dataInjectEn = io.inject_error.injEn && io.inject_error.injSource === 5.U(3.W) // L2CACHE_DATA
+  val dataInjectFire = dataInjectEn && io.req.valid && !io.req.bits.wen
+  val dataInjectMask = if (enableDataECC) {
+    val perBankMask = eccPoisonMask(encBankBits, io.inject_error.injBits)
+    VecInit(Seq.fill(dataBankSplit)(perBankMask)).asUInt
+  } else { 0.U }
+  val arrayRead = Wire(new DSECCBankBlock)
+  arrayRead.data := arrayReadRaw.data ^ Mux(dataInjectFire, dataInjectMask, 0.U)
+  io.inject_error_consumed := dataInjectFire
 
   val error = if (enableDataECC) {
     // cacheParams.dataCode.decode(eccData).error && RegNext(RegNext(io.req.valid && !io.req.bits.wen))

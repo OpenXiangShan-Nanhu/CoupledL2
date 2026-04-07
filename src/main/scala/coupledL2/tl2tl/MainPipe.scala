@@ -29,7 +29,7 @@ import coupledL2.debug._
 import xs.utils.cache.prefetch.{PfSource}
 import coupledL2.prefetch.PrefetchTrain
 import xs.utils.cache.MetaData._
-import xs.utils.{ParallelMux, ParallelPriorityMux, RegNextN}
+import xs.utils.{DelayNWithValid, ParallelMux, ParallelPriorityMux, RegNextN}
 import xs.utils.perf.{HasPerfEvents, XSPerfAccumulate, XSPerfHistogram}
 
 class MainPipe(implicit p: Parameters) extends L2Module with HasPerfEvents {
@@ -678,9 +678,12 @@ class MainPipe(implicit p: Parameters) extends L2Module with HasPerfEvents {
   io.toSourceC <> c_arb.io.out
   io.toSourceD <> d_arb.io.out
 
-  io.error.valid := task_s5.valid
-  io.error.bits.valid := l2Error_s5 // if not enableECC, should be false
-  io.error.bits.address := Cat(task_s5.bits.tag, task_s5.bits.set, task_s5.bits.off)
+  private val errorRaw = WireInit(0.U.asTypeOf(ValidIO(new L2CacheErrorInfo)))
+  errorRaw.valid := task_s5.valid
+  errorRaw.bits.valid := l2Error_s5 // if not enableECC, should be false
+  errorRaw.bits.source := Mux(l2TagError_s5, 4.U(3.W), 5.U(3.W))
+  errorRaw.bits.address := Cat(task_s5.bits.tag, task_s5.bits.set, 0.U(offsetBits.W))
+  io.error := DelayNWithValid(errorRaw, 2)
 
   /* ===== Performance counters ===== */
   // num of mshr req

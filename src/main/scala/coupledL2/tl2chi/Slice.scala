@@ -93,6 +93,9 @@ class Slice()(implicit p: Parameters) extends BaseSlice[OuterBundle]
   dataStorage.io.en := mainPipe.io.toDS.en_s3
   dataStorage.io.req := mainPipe.io.toDS.req_s3
   dataStorage.io.wdata := mainPipe.io.toDS.wdata_s3
+  directory.io.inject_error := io.inject_error
+  dataStorage.io.inject_error := io.inject_error
+  io.inject_error_consumed := directory.io.inject_error_consumed || dataStorage.io.inject_error_consumed
 
   reqArb.io.ATag := reqBuf.io.ATag
   reqArb.io.ASet := reqBuf.io.ASet
@@ -228,8 +231,8 @@ class Slice()(implicit p: Parameters) extends BaseSlice[OuterBundle]
   sinkC.io.c <> inBuf.c(io.in.c)
   io.in.d <> inBuf.d(grantBuf.io.d)
   grantBuf.io.e <> inBuf.e(io.in.e)
-  io.error.valid := RegNext(mainPipe.io.error.valid, false.B)
-  io.error.bits := RegNext(mainPipe.io.error.bits)
+  io.error.valid := mainPipe.io.error.valid
+  io.error.bits := mainPipe.io.error.bits
 
   /* Connect downwards channels */
   io.out.tx.req <> txreq.io.out
