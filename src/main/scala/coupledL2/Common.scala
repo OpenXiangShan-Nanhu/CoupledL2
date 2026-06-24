@@ -454,6 +454,7 @@ class PCrdGrantMatcher(val numPorts: Int) extends Module {
 
 class L2CacheErrorInfo(implicit p: Parameters) extends L2Bundle {
   val valid = Bool()
+  val source = UInt(3.W)
   val address = UInt(addressBits.W)
 }
 
