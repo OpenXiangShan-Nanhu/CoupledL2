@@ -521,9 +521,11 @@ abstract class CoupledL2Base(implicit p: Parameters) extends LazyModule with Has
       l2ECCArb.io.in <> VecInit(slices_l2ECC)
       l2ECCArb.io.out.ready := true.B
       io.error.valid := l2ECCArb.io.out.fire && l2ECCArb.io.out.bits.valid
+      io.error.source := l2ECCArb.io.out.bits.source
       io.error.address := l2ECCArb.io.out.bits.address
     } else {
       io.error.valid := false.B
+      io.error.source := 0.U.asTypeOf(io.error.source)
       io.error.address := 0.U.asTypeOf(io.error.address)
     }
 
