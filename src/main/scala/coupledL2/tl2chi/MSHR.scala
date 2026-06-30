@@ -799,7 +799,14 @@ class MSHR(implicit p: Parameters) extends TL2CHIL2Module with HasCHIOpcodes {
     )
     mp_grant.metaWen := !cmo_cbo && !denied
     mp_grant.tagWen := !cmo_cbo && !dirResult.hit && !denied
-    mp_grant.dsWen := (gotGrantData || probeDirty && (req_get || req.aliasTask.getOrElse(false.B))) && !denied
+    // [Fix] For AcquirePerm miss, CHI only responds with Comp (no data), so data SRAM is left uninitialized.
+    // A subsequent AcquireBlock on the same PA (different alias) will hit the tag and read garbage SRAM data,
+    // triggering a false ECC error before L2 can probe L1 to get the real data.
+    // Fix: write zeros to data SRAM when AcquirePerm misses, making the SRAM content ECC-clean.
+    // Safety: for the alias-triggered AcquireBlock, Grant is only sent after w_rprobeacklast (probe-before-grant
+    // is guaranteed), and useProbeData=true means GrantData uses ProbeAck data, not these zeros.
+    mp_grant.dsWen := (gotGrantData || probeDirty && (req_get || req.aliasTask.getOrElse(false.B)) ||
+      req_acquirePerm && !dirResult.hit) && !denied
     mp_grant.fromL2pft.foreach(_ := req.fromL2pft.get)
     mp_grant.needHint.foreach(_ := false.B)
     mp_grant.replTask := !dirResult.hit && !state.w_replResp && !denied

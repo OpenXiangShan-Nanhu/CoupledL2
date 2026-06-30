@@ -505,7 +505,10 @@ class MainPipe(implicit p: Parameters) extends TL2CHIL2Module with HasCHIOpcodes
     Mux(
       req_s3.useProbeData,
       io.releaseBufResp_s3.bits.data,
-      io.refillBufResp_s3.bits.data
+      // [Fix] AcquirePerm miss: CHI Comp carries no data, so write zeros to keep data SRAM ECC-clean.
+      // A later AcquireBlock on the same PA (different alias) will probe L1 before sending GrantData
+      // (probe-before-grant guaranteed by w_rprobeacklast), so these zeros are never served to L1.
+      Mux(mshr_grant_s3 && req_s3.opcode === Grant, 0.U, io.refillBufResp_s3.bits.data)
     )
   )
 
