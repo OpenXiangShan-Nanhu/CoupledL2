@@ -982,7 +982,8 @@ class MainPipe(implicit p: Parameters) extends TL2CHIL2Module with HasCHIOpcodes
   arb(txdat, io.toTXDAT, Some("toTXDAT"))
 
   io.error.valid := task_s5.valid
-  io.error.bits.valid := l2Error_s5 // if not enableECC, should be false
+  // A snoop nested with an in-flight release uses MSHR-held data, so the directory-miss DS read is not error-valid.
+  io.error.bits.valid := l2Error_s5 && !task_s5.bits.snpHitRelease // if not enableECC, should be false
   io.error.bits.source := Mux(l2TagError_s5, 4.U(3.W), 5.U(3.W))
   io.error.bits.address := Cat(task_s5.bits.tag, task_s5.bits.set, task_s5.bits.off)
 
