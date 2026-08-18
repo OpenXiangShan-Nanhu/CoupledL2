@@ -96,7 +96,8 @@ class SourceB(implicit p: Parameters) extends L2Module {
     probeEntry.rdy   := !conflict
     probeEntry.waitG := OHToUInt(conflictMask)
     probeEntry.task  := io.task.bits
-    HAssert(PopCount(conflictMask) <= 1.U)
+    HAssert(PopCount(conflictMask) <= 1.U,
+      "at most one conflicting probe in SourceB")
   }
 
   /* ======== Issue ======== */

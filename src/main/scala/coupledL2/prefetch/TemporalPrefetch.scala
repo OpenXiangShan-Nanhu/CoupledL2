@@ -164,7 +164,7 @@ class TemporalPrefetch(implicit p: Parameters) extends TPModule {
   val enable = io.enable && cstEnable.orR
 
   if (vaddrBitsOpt.isEmpty) {
-    HAssert(!trainOnVaddr)
+    HAssert(!trainOnVaddr, "trainOnVaddr must be false when vaddrBits is empty")
   }
 
   val pending_valid = Wire(Bool())
@@ -260,7 +260,7 @@ class TemporalPrefetch(implicit p: Parameters) extends TPModule {
 
   tpDataQueue.io.enq.valid := io.tpmeta_port.resp.valid && io.tpmeta_port.resp.bits.hartid === io.hartid
   tpDataQueue.io.enq.bits.rawData := io.tpmeta_port.resp.bits.rawData
-  HAssert(tpDataQueue.io.enq.ready === true.B) // tpDataQueue is never full
+  HAssert(tpDataQueue.io.enq.ready === true.B, "tpDataQueue should never be full")
 
 
   /* Recorder logic TODO: compress data based on max delta */
@@ -276,13 +276,14 @@ class TemporalPrefetch(implicit p: Parameters) extends TPModule {
   when(dorecord_s2) {
     recorder_idx := recorder_idx + 1.U
     recorder_data(recorder_idx) := record_data_in >> offsetBits.U // eliminate cacheline offset
-    HAssert((record_data_in >> offsetBits.U)(fullAddressBits - 1, metaDataLength) === 0.U)
+    HAssert((record_data_in >> offsetBits.U)(fullAddressBits - 1, metaDataLength) === 0.U,
+      "recorded address high bits must be zero after dropping offset")
     when(recorder_idx === (recordThres-1.U)) {
       write_record := true.B
       recorder_idx := 0.U
       write_record_trigger := triggerQueue.io.deq.bits
       triggerQueue.io.deq.ready := true.B
-      HAssert(triggerQueue.io.deq.valid)
+      HAssert(triggerQueue.io.deq.valid, "triggerQueue must be valid when finishing a record")
     }
   }
   when(write_record) {
@@ -315,7 +316,7 @@ class TemporalPrefetch(implicit p: Parameters) extends TPModule {
   dataWriteQueue.io.enq.bits.set := tpTable_w_set
   dataWriteQueue.io.enq.bits.way := tpTable_w_way
   dataWriteQueue.io.enq.bits.hartid := io.hartid
-  HAssert(dataWriteQueue.io.enq.ready === true.B) // TODO: support back-pressure
+  HAssert(dataWriteQueue.io.enq.ready === true.B, "dataWriteQueue should never be full") // TODO: support back-pressure
 
   when(resetIdx === 0.U) {
     resetFinish := true.B

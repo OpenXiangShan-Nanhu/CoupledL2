@@ -337,7 +337,8 @@ class Prefetcher(implicit p: Parameters) extends PrefetchModule {
     HAssert(!pfRcv.get.io.req.valid ||
       pfRcv.get.io.req.bits.pfSource === MemReqSource.Prefetch2L2SMS.id.U ||
       pfRcv.get.io.req.bits.pfSource === MemReqSource.Prefetch2L2Stream.id.U ||
-      pfRcv.get.io.req.bits.pfSource === MemReqSource.Prefetch2L2Stride.id.U
+      pfRcv.get.io.req.bits.pfSource === MemReqSource.Prefetch2L2Stride.id.U,
+      "pfRcv request must be SMS, Stream, or Stride"
     )
   }
   if (hasTPPrefetcher) {

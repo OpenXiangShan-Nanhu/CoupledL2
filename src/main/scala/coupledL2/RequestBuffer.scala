@@ -213,7 +213,8 @@ class RequestBuffer(flow: Boolean = true, entries: Int = 4)(implicit p: Paramete
     entry.waitMS  := conflictMask(in)
 
 //    entry.depMask := depMask
-    HAssert(PopCount(conflictMaskFromA(in)) <= 2.U)
+    HAssert(PopCount(conflictMaskFromA(in)) <= 2.U,
+      "at most two A-channel conflicts in request buffer")
   }
 
   /* ======== Issue ======== */

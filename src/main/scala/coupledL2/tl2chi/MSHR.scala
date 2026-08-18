@@ -1044,7 +1044,8 @@ class MSHR(implicit p: Parameters) extends TL2CHIL2Module with HasCHIOpcodes {
     when (wcompack_valid) {
       state.s_wcompack.get := true.B
     }
-    HAssert(!(rcompack_valid && wcompack_valid))
+    HAssert(!(rcompack_valid && wcompack_valid),
+      "rcompack and wcompack must not fire together")
   }
   when (io.tasks.source_b.fire) {
     state.s_pprobe := true.B
@@ -1353,8 +1354,10 @@ class MSHR(implicit p: Parameters) extends TL2CHIL2Module with HasCHIOpcodes {
   io.msInfo.bits.releaseToClean := releaseToClean
   io.msInfo.bits.channel := req.channel
 
-  HAssert(!(c_resp.valid && !io.status.bits.w_c_resp))
-  HAssert(!(rxrsp.valid && rxrsp.bits.chiOpcode.get =/= PCrdGrant && !io.status.bits.w_d_resp))
+  HAssert(!(c_resp.valid && !io.status.bits.w_c_resp),
+    "C resp only when MSHR is waiting for C resp")
+  HAssert(!(rxrsp.valid && rxrsp.bits.chiOpcode.get =/= PCrdGrant && !io.status.bits.w_d_resp),
+    "D resp only when MSHR is waiting for D resp")
 
   /* ======== Handling Nested C ======== */
   // for A miss, only when replResp do we finally choose a way, allowing nested C

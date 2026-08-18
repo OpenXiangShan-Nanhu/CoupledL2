@@ -113,7 +113,7 @@ class SinkC(implicit p: Parameters) extends L2Module {
         dataBuf(nextPtr)(beat) := io.c.bits.data
         beatValids(nextPtr)(beat) := true.B
       }.otherwise {
-        HAssert(last)
+        HAssert(last, "non-first ReleaseData beat must be last")
         dataBuf(nextPtrReg)(beat) := io.c.bits.data
         beatValids(nextPtrReg)(beat) := true.B
       }

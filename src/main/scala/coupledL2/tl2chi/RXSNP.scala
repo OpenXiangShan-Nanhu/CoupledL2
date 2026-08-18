@@ -130,7 +130,7 @@ class RXSNP(
   HAssert(stallCnt <= STALL_CNT_MAX,
     "stallCnt full! maybe there is a deadlock! addr => 0x${rxsnp.bits.addr} req_opcode => 0x${rxsnp.bits.opcode} txn_id => 0x${rxsnp.bits.txnID}")
 
-  HAssert(!(stall && rxsnp.fire))
+  HAssert(!(stall && rxsnp.fire), "must not fire RXSNP while stalled")
 
   def fromSnpToTaskBundle(snp: CHISNP): TaskBundle = {
     val task = WireInit(0.U.asTypeOf(new TaskBundle))

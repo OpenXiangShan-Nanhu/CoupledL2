@@ -83,7 +83,7 @@ class SplittedSRAM[T <: Data]
   } else ren_vec_1
 
   // only one read/write
-  HAssert({PopCount(ren_vec) <= 1.U})
+  HAssert({PopCount(ren_vec) <= 1.U}, "at most one SRAM read or write")
 
   // TODO: we should consider the readys of all sram to be accessed, and orR them
   // but since waySplitted and dataSplitted smaller srams should have the same behavior

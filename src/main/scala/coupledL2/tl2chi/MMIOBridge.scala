@@ -399,7 +399,8 @@ class MMIOBridgeImp(outer: MMIOBridge) extends LazyModuleImp(outer)
   }).orR
   io.rx.rsp.ready := true.B
   HAssert(!io.rx.rsp.valid || Cat(entries.zipWithIndex.map { case (entry, i) =>
-    entry.io.chi.rx.rsp.ready && io.rx.rsp.bits.txnID === i.U }).orR)
+    entry.io.chi.rx.rsp.ready && io.rx.rsp.bits.txnID === i.U }).orR,
+    "RX RSP must match a ready MMIOBridge entry")
 
   HAssert.placePipe(3)
   dontTouch(io)
