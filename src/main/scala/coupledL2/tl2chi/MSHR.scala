@@ -1420,7 +1420,9 @@ class MSHR(implicit p: Parameters) extends TL2CHIL2Module with HasCHIOpcodes {
     mshrAddrSeq = mshrAddrSeq + cf" addr_bank$i => 0x$addr%x "
   }
   dontTouch(mshrAddrVec) // for debug
-  HAssert.checkTimeout(!req_valid, 100000, cf"MSHR Timeout!, maybe there is a deadlock!" + mshrAddrSeq + cf"req_opcode => ${req.opcode} channel => 0b${req.channel}")
+  HAssert.checkTimeout(!req_valid, 100000,
+    "MSHR Timeout, maybe there is a deadlock!",
+    cf"MSHR Timeout!, maybe there is a deadlock!" + mshrAddrSeq + cf"req_opcode => ${req.opcode} channel => 0b${req.channel}")
 
   val evictFire = io.tasks.txreq.fire && io.tasks.txreq.bits.opcode === Evict ||
     io.tasks.mainpipe.fire && io.tasks.mainpipe.bits.opcode === Evict && io.tasks.mainpipe.bits.toTXREQ

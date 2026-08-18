@@ -186,7 +186,7 @@ class MSHRCtl(implicit p: Parameters) extends TL2CHIL2Module with HasCHIOpcodes 
   io.nestedwbDataId.bits := ParallelPriorityMux(mshrs.zipWithIndex.map {
     case (mshr, i) => (mshr.io.nestedwbData, i.U)
   })
-  HAssert(RegNext(PopCount(mshrs.map(_.io.nestedwbData)) <= 1.U), cf"should only be one nestedwbData")
+  HAssert(RegNext(PopCount(mshrs.map(_.io.nestedwbData)) <= 1.U), "should only be one nestedwbData")
 
 
   /* Status for topDown monitor */
