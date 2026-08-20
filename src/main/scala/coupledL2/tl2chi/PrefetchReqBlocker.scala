@@ -14,8 +14,8 @@ import freechips.rocketchip.diplomacy._
 object LdState {
   val Slight    = "b00".U // Less than 50% full
   val Moderate  = "b01".U // Greater than 50% full
-  val High      = "b10".U // Greater than 75% full
-  val Critical  = "b11".U // Greater than 90% full
+  val High      = "b10".U // Greater than 85% full
+  val Critical  = "b11".U // Greater than 95% full
 }
 class PrefetchReqBlocker(implicit p: Parameters) extends L2Module with HasCHIOpcodes {
   val io = IO(new Bundle() {
